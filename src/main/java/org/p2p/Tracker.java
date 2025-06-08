@@ -23,6 +23,10 @@ public class Tracker {
     private final AtomicBoolean running;
     private ServerSocket serverSocket;
 
+    public static void main(String[] args) {
+        new Tracker(4444).start();
+    }
+
     public Tracker(int port) {
         this.port = port;
         this.peers = new ConcurrentHashMap<>();
@@ -47,7 +51,8 @@ public class Tracker {
             serverSocket = new ServerSocket(port);
             running.set(true);
 
-            System.out.println("Tracker iniciado na porta " + port);
+            String ip = serverSocket.getInetAddress().getHostAddress();
+            System.out.println("Tracker iniciado: " + ip + ":" + port);
             startPeerCleanup();
 
             while (running.get()) {
@@ -90,8 +95,6 @@ public class Tracker {
     }
 
     private Message processMessage(Message message) {
-        System.out.println("Processando mensagem: " + message.getType());
-
         switch (message.getType()) {
             case REGISTER -> {
                 return handleRegister(message);
@@ -135,7 +138,6 @@ public class Tracker {
             peer.getAvailableFiles().clear();
             peer.getAvailableFiles().addAll(availableFiles);
 
-            // Atualizar seeders dos arquivos
             for (String fileName : availableFiles) {
                 FileInfo fileInfo = files.get(fileName);
                 if (fileInfo != null) {
@@ -221,4 +223,5 @@ public class Tracker {
 
         System.out.println("========================\n");
     }
+
 }

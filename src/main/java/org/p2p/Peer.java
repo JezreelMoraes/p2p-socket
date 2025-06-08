@@ -3,6 +3,7 @@ package org.p2p;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
@@ -15,23 +16,24 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import lombok.Getter;
 
 class Peer {
 
+    private static final int MIN_PORT_NUMBER = 5000;
+    private static final int MAX_PORT_NUMBER = 6000;
+
     @Getter
     private final String peerId;
-    private final String ip;
-    private final int port;
     private final String trackerIp;
     private final int trackerPort;
     private final Set<String> ownedFiles;
     private final Map<String, PeerConnection> connections;
     private final ScheduledExecutorService scheduler;
-    private final AtomicBoolean running;
+
     private ServerSocket serverSocket;
+    private int port;
 
     private final Map<String, Integer> uploadCounts;
     private final Map<String, Integer> downloadCounts;
@@ -39,16 +41,17 @@ class Peer {
     private final Set<String> interestedPeers;
     private String optimisticUnchokePeer;
 
-    public Peer(String peerId, String ip, int port, String trackerIp, int trackerPort) {
-        this.peerId = peerId;
-        this.ip = ip;
-        this.port = port;
+    public static void main(String[] args) {
+        new Peer("localhost", 4444).start();
+    }
+
+    public Peer(String trackerIp, int trackerPort) {
+        this.peerId = String.valueOf(System.currentTimeMillis());
         this.trackerIp = trackerIp;
         this.trackerPort = trackerPort;
         this.ownedFiles = ConcurrentHashMap.newKeySet();
         this.connections = new ConcurrentHashMap<>();
         this.scheduler = Executors.newScheduledThreadPool(4);
-        this.running = new AtomicBoolean(false);
 
         this.uploadCounts = new ConcurrentHashMap<>();
         this.downloadCounts = new ConcurrentHashMap<>();
@@ -61,7 +64,7 @@ class Peer {
 
     private void initializeRandomFiles() {
         Random random = new Random();
-        int numFiles = random.nextInt(5) + 2; // 2-6 arquivos iniciais
+        int numFiles = random.nextInt(5) + 2;
 
         for (int i = 0; i < numFiles; i++) {
             int fileNum = random.nextInt(10) + 1;
@@ -72,42 +75,63 @@ class Peer {
     }
 
     public void start() {
-        if (running.get()) return;
-
         try {
-            serverSocket = new ServerSocket(port);
-            running.set(true);
+            findFreePort();
 
-            System.out.println("Peer " + peerId + " iniciado na porta " + port);
+            this.serverSocket = new ServerSocket(this.port);
+            String ip = serverSocket.getInetAddress().getHostAddress();
+            System.out.println("Peer " + peerId + " iniciado: " + ip + ":" + port);
 
+            System.out.println("Registrando no tracker");
             registerWithTracker();
+            System.out.println("Iniciando atividades periodicas");
             startPeriodicTasks();
+            System.out.println("Aceitando comunicação de pares");
             acceptConnections();
-
-        } catch (IOException e) {
+        } catch (Exception e) {
             System.err.println("Erro ao iniciar Peer " + peerId + ": " + e);
         }
     }
 
-    private void registerWithTracker() {
-        try (Socket socket = new Socket(trackerIp, trackerPort);
-             ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
-             ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
-
-            Message message = new Message(Message.Type.REGISTER, peerId);
-            message.addData("ip", ip);
-            message.addData("port", port);
-
-            out.writeObject(message);
-            Message response = (Message) in.readObject();
-
-            if ("success".equals(response.getData("status"))) {
-                System.out.println("Peer " + peerId + " registrado com sucesso no tracker");
-            }
-
-        } catch (Exception e) {
-            System.err.println("Erro ao registrar com tracker: " + e);
+    private void findFreePort() {
+        for (int port = MIN_PORT_NUMBER; port <= MAX_PORT_NUMBER; port++) {
+            try (ServerSocket ignored = new ServerSocket(port)) {
+                this.port = port;
+                break;
+            } catch (IOException ignored) {}
         }
+    }
+
+    private void registerWithTracker() {
+        while (!this.serverSocket.isClosed()) {
+            try (Socket socket = new Socket(trackerIp, trackerPort);
+                 ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+                 ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
+
+                System.out.println("Tentando registrar no tracker");
+
+                InetAddress localAddress = socket.getLocalAddress();
+                String ip = localAddress.getHostAddress();
+                int port = socket.getLocalPort();
+
+                Message message = new Message(Message.Type.REGISTER, peerId);
+                message.addData("ip", ip);
+                message.addData("port", port);
+
+                out.writeObject(message);
+                Message response = (Message) in.readObject();
+
+                if ("success".equals(response.getData("status"))) {
+                    System.out.println("Peer " + peerId + " registrado com sucesso no tracker");
+                    return;
+                }
+
+            } catch (Exception e) {
+                System.err.println("Erro ao registrar com tracker: " + e);
+                try { Thread.sleep(1000); } catch (InterruptedException ignored) {}
+            }
+        }
+
     }
 
     private void startPeriodicTasks() {
@@ -126,8 +150,7 @@ class Peer {
             message.addData("files", new ArrayList<>(ownedFiles));
 
             out.writeObject(message);
-            Message response = (Message) in.readObject();
-
+            in.readObject();
         } catch (Exception e) {
             System.err.println("Erro no announce: " + e);
         }
@@ -207,8 +230,7 @@ class Peer {
             out.writeObject(message);
             Message response = (Message) in.readObject();
 
-            @SuppressWarnings("unchecked")
-            List<PeerInfo> peersWithFile = (List<PeerInfo>) response.getData("peers");
+            List<PeerInfo> peersWithFile = response.getData("peers");
 
             if (!peersWithFile.isEmpty()) {
                 PeerInfo targetPeer = peersWithFile.get(0);
@@ -245,20 +267,18 @@ class Peer {
             }
 
         } catch (Exception e) {
-            System.err.println("Erro ao solicitar arquivo de peer: " + e);
+            System.err.println("Erro ao solicitar arquivo de peer " + targetPeer.getIp() + ":" + targetPeer.getPort() + " - " + e);
         }
     }
 
     private void acceptConnections() {
         scheduler.submit(() -> {
-            while (running.get()) {
+            while (!serverSocket.isClosed()) {
                 try {
                     Socket clientSocket = serverSocket.accept();
                     handlePeerConnection(clientSocket);
                 } catch (IOException e) {
-                    if (running.get()) {
-                        System.err.println("Erro ao aceitar conexão: " + e);
-                    }
+                    System.err.println("Erro ao aceitar conexão: " + e);
                 }
             }
         });
@@ -337,7 +357,6 @@ class Peer {
     }
 
     public void stop() {
-        running.set(false);
         if (serverSocket != null && !serverSocket.isClosed()) {
             try {
                 serverSocket.close();
@@ -345,6 +364,7 @@ class Peer {
                 System.err.println("Erro ao fechar servidor: " + e);
             }
         }
+
         scheduler.shutdown();
     }
 
