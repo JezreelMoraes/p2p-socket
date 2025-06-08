@@ -1,12 +1,13 @@
 package org.p2p;
 
+import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 
 import lombok.Getter;
 
 @Getter
-public class Message {
+public class Message implements Serializable {
 
     public enum Type {
         REGISTER, ANNOUNCE, REQUEST_PEERS, PEER_LIST, FILE_REQUEST,

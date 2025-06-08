@@ -1,12 +1,13 @@
 package org.p2p;
 
+import java.io.Serializable;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import lombok.Getter;
 
 @Getter
-public class PeerInfo {
+public class PeerInfo implements Serializable {
 
     private final String peerId;
     private final String ip;
