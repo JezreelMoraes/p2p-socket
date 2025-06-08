@@ -19,13 +19,13 @@ import java.util.concurrent.TimeUnit;
 
 import lombok.Getter;
 
-class Peer {
+class Peer extends Loggable {
 
     private static final int MIN_PORT_NUMBER = 5000;
     private static final int MAX_PORT_NUMBER = 6000;
 
     @Getter
-    private final String peerId;
+    private final String id;
     private final String trackerIp;
     private final int trackerPort;
     private final Set<String> ownedFiles;
@@ -42,14 +42,17 @@ class Peer {
     private String optimisticUnchokePeer;
 
     public static void main(String[] args) {
-        new Peer("localhost", 4444).start();
+        new Peer("PAIR_1", "localhost", 4444).start();
     }
 
-    public Peer(String trackerIp, int trackerPort) {
-        this.peerId = String.valueOf(System.currentTimeMillis());
+    public Peer(String id, String trackerIp, int trackerPort) {
+        this(id, trackerIp, trackerPort, new HashSet<>());
+    }
+
+    public Peer(String id, String trackerIp, int trackerPort, Set<String> files) {
+        this.id = id;
         this.trackerIp = trackerIp;
         this.trackerPort = trackerPort;
-        this.ownedFiles = ConcurrentHashMap.newKeySet();
         this.connections = new ConcurrentHashMap<>();
         this.scheduler = Executors.newScheduledThreadPool(4);
 
@@ -59,7 +62,8 @@ class Peer {
         this.interestedPeers = ConcurrentHashMap.newKeySet();
         this.optimisticUnchokePeer = null;
 
-        initializeRandomFiles();
+        this.ownedFiles = files;
+//        initializeRandomFiles();
     }
 
     private void initializeRandomFiles() {
@@ -68,10 +72,10 @@ class Peer {
 
         for (int i = 0; i < numFiles; i++) {
             int fileNum = random.nextInt(10) + 1;
-            ownedFiles.add("arquivo" + fileNum + ".txt");
+            ownedFiles.add(fileNum + ".txt");
         }
 
-        System.out.println("Peer " + peerId + " inicializado com arquivos: " + ownedFiles);
+        logInfo("Peer " + id + " inicializado com arquivos: " + ownedFiles);
     }
 
     public void start() {
@@ -80,16 +84,16 @@ class Peer {
 
             this.serverSocket = new ServerSocket(this.port);
             String ip = serverSocket.getInetAddress().getHostAddress();
-            System.out.println("Peer " + peerId + " iniciado: " + ip + ":" + port);
+            logInfo("Peer " + id + " iniciado: " + ip + ":" + port);
 
-            System.out.println("Registrando no tracker");
+            logInfo("Registrando no tracker");
             registerWithTracker();
-            System.out.println("Iniciando atividades periodicas");
+            logInfo("Iniciando atividades periodicas");
             startPeriodicTasks();
-            System.out.println("Aceitando comunicação de pares");
+            logInfo("Aceitando comunicação de pares");
             acceptConnections();
         } catch (Exception e) {
-            System.err.println("Erro ao iniciar Peer " + peerId + ": " + e);
+            logError("Erro ao iniciar Peer " + id + ": " + e);
         }
     }
 
@@ -108,13 +112,12 @@ class Peer {
                  ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
                  ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
 
-                System.out.println("Tentando registrar no tracker");
+                logInfo("Tentando registrar no tracker");
 
                 InetAddress localAddress = socket.getLocalAddress();
                 String ip = localAddress.getHostAddress();
-                int port = socket.getLocalPort();
 
-                Message message = new Message(Message.Type.REGISTER, peerId);
+                Message message = new Message(Message.Type.REGISTER, id);
                 message.addData("ip", ip);
                 message.addData("port", port);
 
@@ -122,12 +125,12 @@ class Peer {
                 Message response = (Message) in.readObject();
 
                 if ("success".equals(response.getData("status"))) {
-                    System.out.println("Peer " + peerId + " registrado com sucesso no tracker");
+                    logInfo("Peer " + id + " registrado com sucesso no tracker");
                     return;
                 }
 
             } catch (Exception e) {
-                System.err.println("Erro ao registrar com tracker: " + e);
+                logError("Erro ao registrar com tracker: " + e);
                 try { Thread.sleep(1000); } catch (InterruptedException ignored) {}
             }
         }
@@ -146,13 +149,13 @@ class Peer {
              ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
              ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
 
-            Message message = new Message(Message.Type.ANNOUNCE, peerId);
+            Message message = new Message(Message.Type.ANNOUNCE, id);
             message.addData("files", new ArrayList<>(ownedFiles));
 
             out.writeObject(message);
             in.readObject();
         } catch (Exception e) {
-            System.err.println("Erro no announce: " + e);
+            logError("Erro no announce: " + e);
         }
     }
 
@@ -184,7 +187,7 @@ class Peer {
             Random random = new Random();
             optimisticUnchokePeer = chokedList.get(random.nextInt(chokedList.size()));
             unchokePeer(optimisticUnchokePeer);
-            System.out.println("Peer " + peerId + " - Optimistic unchoke: " + optimisticUnchokePeer);
+            logInfo("Peer " + id + " - Optimistic unchoke: " + optimisticUnchokePeer);
         }
     }
 
@@ -192,7 +195,7 @@ class Peer {
         chokedPeers.add(targetPeerId);
         PeerConnection connection = connections.get(targetPeerId);
         if (connection != null) {
-            connection.sendMessage(new Message(Message.Type.CHOKE, peerId));
+            connection.sendMessage(new Message(Message.Type.CHOKE, id));
         }
     }
 
@@ -200,14 +203,14 @@ class Peer {
         chokedPeers.remove(targetPeerId);
         PeerConnection connection = connections.get(targetPeerId);
         if (connection != null) {
-            connection.sendMessage(new Message(Message.Type.UNCHOKE, peerId));
+            connection.sendMessage(new Message(Message.Type.UNCHOKE, id));
         }
     }
 
     private void searchForMissingFiles() {
         Set<String> allFiles = Set.of(
-            "arquivo1.txt", "arquivo2.txt", "arquivo3.txt", "arquivo4.txt", "arquivo5.txt",
-            "arquivo6.txt", "arquivo7.txt", "arquivo8.txt", "arquivo9.txt", "arquivo10.txt"
+            "1.txt", "2.txt", "3.txt", "4.txt", "5.txt",
+            "6.txt", "7.txt", "8.txt", "9.txt", "10.txt"
         );
 
         Set<String> missingFiles = new HashSet<>(allFiles);
@@ -224,7 +227,7 @@ class Peer {
              ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
              ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
 
-            Message message = new Message(Message.Type.REQUEST_PEERS, peerId);
+            Message message = new Message(Message.Type.REQUEST_PEERS, id);
             message.addData("fileName", fileName);
 
             out.writeObject(message);
@@ -234,13 +237,13 @@ class Peer {
 
             if (!peersWithFile.isEmpty()) {
                 PeerInfo targetPeer = peersWithFile.get(0);
-                if (!targetPeer.getPeerId().equals(peerId)) {
+                if (!targetPeer.getPeerId().equals(id)) {
                     requestFileFromPeer(targetPeer, fileName);
                 }
             }
 
         } catch (Exception e) {
-            System.err.println("Erro ao buscar peers para " + fileName + ": " + e);
+            logError("Erro ao buscar peers para " + fileName + ": " + e);
         }
     }
 
@@ -249,7 +252,7 @@ class Peer {
              ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
              ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
 
-            Message request = new Message(Message.Type.FILE_REQUEST, peerId);
+            Message request = new Message(Message.Type.FILE_REQUEST, id);
             request.addData("fileName", fileName);
 
             out.writeObject(request);
@@ -261,13 +264,13 @@ class Peer {
                     ownedFiles.add(fileName);
                     downloadCounts.put(targetPeer.getPeerId(),
                         downloadCounts.getOrDefault(targetPeer.getPeerId(), 0) + 1);
-                    System.out.println("Peer " + peerId + " obteve arquivo " + fileName +
+                    logInfo("Peer " + id + " obteve arquivo " + fileName +
                         " de " + targetPeer.getPeerId());
                 }
             }
 
         } catch (Exception e) {
-            System.err.println("Erro ao solicitar arquivo de peer " + targetPeer.getIp() + ":" + targetPeer.getPort() + " - " + e);
+            logError("Erro ao solicitar arquivo de peer " + targetPeer.getIp() + ":" + targetPeer.getPort() + " - " + e);
         }
     }
 
@@ -278,7 +281,7 @@ class Peer {
                     Socket clientSocket = serverSocket.accept();
                     handlePeerConnection(clientSocket);
                 } catch (IOException e) {
-                    System.err.println("Erro ao aceitar conexão: " + e);
+                    logError("Erro ao aceitar conexão: " + e);
                 }
             }
         });
@@ -297,12 +300,12 @@ class Peer {
                 }
 
             } catch (Exception e) {
-                System.err.println("Erro ao processar conexão de peer: " + e);
+                logError("Erro ao processar conexão de peer: " + e);
             } finally {
                 try {
                     clientSocket.close();
                 } catch (IOException e) {
-                    System.err.println("Erro ao fechar socket: " + e);
+                    logError("Erro ao fechar socket: " + e);
                 }
             }
         });
@@ -314,11 +317,11 @@ class Peer {
                 return handleFileRequest(message);
             }
             case CHOKE -> {
-                System.out.println("Peer " + peerId + " foi choked por " + message.getSenderId());
+                logInfo("Peer " + id + " foi choked por " + message.getSenderId());
                 return null;
             }
             case UNCHOKE -> {
-                System.out.println("Peer " + peerId + " foi unchoked por " + message.getSenderId());
+                logInfo("Peer " + id + " foi unchoked por " + message.getSenderId());
                 return null;
             }
             case INTERESTED -> {
@@ -339,14 +342,14 @@ class Peer {
         String fileName = message.getData("fileName");
         String requesterId = message.getSenderId();
 
-        Message response = new Message(Message.Type.FILE_RESPONSE, peerId);
+        Message response = new Message(Message.Type.FILE_RESPONSE, id);
 
         if (ownedFiles.contains(fileName) && !chokedPeers.contains(requesterId)) {
             uploadCounts.put(requesterId, uploadCounts.getOrDefault(requesterId, 0) + 1);
             response.addData("success", true);
             response.addData("fileName", fileName);
 
-            System.out.println("Peer " + peerId + " enviou arquivo " + fileName +
+            logInfo("Peer " + id + " enviou arquivo " + fileName +
                 " para " + requesterId);
         } else {
             response.addData("success", false);
@@ -356,12 +359,20 @@ class Peer {
         return response;
     }
 
+    @Override
+    protected String buildInfo() {
+        return String.format("Peer[%s:%d] ",
+            this.id,
+            this.port
+        );
+    }
+
     public void stop() {
         if (serverSocket != null && !serverSocket.isClosed()) {
             try {
                 serverSocket.close();
             } catch (IOException e) {
-                System.err.println("Erro ao fechar servidor: " + e);
+                logError("Erro ao fechar servidor: " + e);
             }
         }
 
@@ -369,15 +380,15 @@ class Peer {
     }
 
     public void printStatus() {
-        System.out.println("\n=== STATUS DO PEER " + peerId + " ===");
-        System.out.println("Arquivos possuídos: " + ownedFiles);
-        System.out.println("Conexões ativas: " + connections.size());
-        System.out.println("Peers choked: " + chokedPeers);
-        System.out.println("Peers interessados: " + interestedPeers);
-        System.out.println("Optimistic unchoke: " + optimisticUnchokePeer);
-        System.out.println("Upload counts: " + uploadCounts);
-        System.out.println("Download counts: " + downloadCounts);
-        System.out.println("===============================\n");
+        logInfo("\n=== STATUS DO PEER " + id + " ===");
+        logInfo("Arquivos possuídos: " + ownedFiles);
+        logInfo("Conexões ativas: " + connections.size());
+        logInfo("Peers choked: " + chokedPeers);
+        logInfo("Peers interessados: " + interestedPeers);
+        logInfo("Optimistic unchoke: " + optimisticUnchokePeer);
+        logInfo("Upload counts: " + uploadCounts);
+        logInfo("Download counts: " + downloadCounts);
+        logInfo("===============================\n");
     }
 
 }

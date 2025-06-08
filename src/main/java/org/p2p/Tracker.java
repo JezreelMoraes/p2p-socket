@@ -14,7 +14,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-public class Tracker {
+public class Tracker extends Loggable {
 
     private final int port;
     private final Map<String, PeerInfo> peers;
@@ -39,7 +39,7 @@ public class Tracker {
 
     private void initializeFiles() {
         for (int i = 1; i <= 10; i++) {
-            String fileName = "arquivo" + i + ".txt";
+            String fileName = i + ".txt";
             files.put(fileName, new FileInfo(fileName, 1024 * i, "checksum" + i));
         }
     }
@@ -52,7 +52,7 @@ public class Tracker {
             running.set(true);
 
             String ip = serverSocket.getInetAddress().getHostAddress();
-            System.out.println("Tracker iniciado: " + ip + ":" + port);
+            logInfo("Tracker iniciado: " + ip + ":" + port);
             startPeerCleanup();
 
             while (running.get()) {
@@ -61,12 +61,12 @@ public class Tracker {
                     handleClient(clientSocket);
                 } catch (IOException e) {
                     if (running.get()) {
-                        System.err.println("Erro ao aceitar conexão: " + e);
+                        logError("Erro ao aceitar conexão: " + e);
                     }
                 }
             }
         } catch (IOException e) {
-            System.err.println("Erro ao iniciar Tracker: " + e);
+            logError("Erro ao iniciar Tracker: " + e);
         }
     }
 
@@ -83,12 +83,12 @@ public class Tracker {
                 }
 
             } catch (Exception e) {
-                System.err.println("Erro ao processar cliente: " + e);
+                logError("Erro ao processar cliente: " + e);
             } finally {
                 try {
                     clientSocket.close();
                 } catch (IOException e) {
-                    System.err.println("Erro ao fechar socket: " + e);
+                    logError("Erro ao fechar socket: " + e);
                 }
             }
         });
@@ -106,7 +106,7 @@ public class Tracker {
                 return handleRequestPeers(message);
             }
             default -> {
-                System.out.println("Tipo de mensagem não suportado: " + message.getType());
+                logInfo("Tipo de mensagem não suportado: " + message.getType());
                 return null;
             }
         }
@@ -120,7 +120,7 @@ public class Tracker {
         PeerInfo peer = new PeerInfo(peerId, ip, port);
         peers.put(peerId, peer);
 
-        System.out.println("Peer registrado: " + peer);
+        logInfo("Peer registrado: " + peer);
 
         Message response = new Message(Message.Type.REGISTER, "tracker");
         response.addData("status", "success");
@@ -145,7 +145,7 @@ public class Tracker {
                 }
             }
 
-            System.out.println("Announce recebido de " + peerId + ": " + availableFiles);
+            logInfo("Announce recebido de " + peerId + ": " + availableFiles);
         }
 
         Message response = new Message(Message.Type.ANNOUNCE, "tracker");
@@ -167,7 +167,7 @@ public class Tracker {
         response.addData("fileName", fileName);
         response.addData("peers", peersWithFile);
 
-        System.out.println("Lista de peers para " + fileName + ": " + peersWithFile.size() + " peers");
+        logInfo("Lista de peers para " + fileName + ": " + peersWithFile.size() + " peers");
 
         return response;
     }
@@ -189,9 +189,16 @@ public class Tracker {
                     fileInfo.removeSeeder(peerId);
                 }
 
-                System.out.println("Peer inativo removido: " + peerId);
+                logInfo("Peer inativo removido: " + peerId);
             }
         }, 30, 30, TimeUnit.SECONDS);
+    }
+
+    @Override
+    protected String buildInfo() {
+        return String.format("Tracker[%d] ",
+            this.port
+        );
     }
 
     public void stop() {
@@ -201,7 +208,7 @@ public class Tracker {
             try {
                 serverSocket.close();
             } catch (IOException e) {
-                System.err.println("Erro ao fechar servidor: " + e);
+                logError("Erro ao fechar servidor: " + e);
             }
         }
 
@@ -209,19 +216,19 @@ public class Tracker {
     }
 
     public void printStatus() {
-        System.out.println("\n=== STATUS DO TRACKER ===");
-        System.out.println("Peers conectados: " + peers.size());
+        logInfo("\n=== STATUS DO TRACKER ===");
+        logInfo("Peers conectados: " + peers.size());
 
         for (PeerInfo peer : peers.values()) {
-            System.out.println("  " + peer);
+            logInfo("  " + peer);
         }
 
-        System.out.println("Arquivos disponíveis: " + files.size());
+        logInfo("Arquivos disponíveis: " + files.size());
         for (FileInfo file : files.values()) {
-            System.out.println("  " + file.getFileName() + " - Seeders: " + file.getSeeders().size());
+            logInfo("  " + file.getFileName() + " - Seeders: " + file.getSeeders().size());
         }
 
-        System.out.println("========================\n");
+        logInfo("========================\n");
     }
 
 }
