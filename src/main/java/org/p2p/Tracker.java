@@ -56,12 +56,12 @@ public class Tracker {
                     handleClient(clientSocket);
                 } catch (IOException e) {
                     if (running.get()) {
-                        System.err.println("Erro ao aceitar conexão: " + e.getMessage());
+                        System.err.println("Erro ao aceitar conexão: " + e);
                     }
                 }
             }
         } catch (IOException e) {
-            System.err.println("Erro ao iniciar Tracker: " + e.getMessage());
+            System.err.println("Erro ao iniciar Tracker: " + e);
         }
     }
 
@@ -78,18 +78,20 @@ public class Tracker {
                 }
 
             } catch (Exception e) {
-                System.err.println("Erro ao processar cliente: " + e.getMessage());
+                System.err.println("Erro ao processar cliente: " + e);
             } finally {
                 try {
                     clientSocket.close();
                 } catch (IOException e) {
-                    System.err.println("Erro ao fechar socket: " + e.getMessage());
+                    System.err.println("Erro ao fechar socket: " + e);
                 }
             }
         });
     }
 
     private Message processMessage(Message message) {
+        System.out.println("Processando mensagem: " + message.getType());
+
         switch (message.getType()) {
             case REGISTER -> {
                 return handleRegister(message);
@@ -197,7 +199,7 @@ public class Tracker {
             try {
                 serverSocket.close();
             } catch (IOException e) {
-                System.err.println("Erro ao fechar servidor: " + e.getMessage());
+                System.err.println("Erro ao fechar servidor: " + e);
             }
         }
 

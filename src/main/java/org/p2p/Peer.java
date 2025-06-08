@@ -85,7 +85,7 @@ class Peer {
             acceptConnections();
 
         } catch (IOException e) {
-            System.err.println("Erro ao iniciar Peer " + peerId + ": " + e.getMessage());
+            System.err.println("Erro ao iniciar Peer " + peerId + ": " + e);
         }
     }
 
@@ -106,7 +106,7 @@ class Peer {
             }
 
         } catch (Exception e) {
-            System.err.println("Erro ao registrar com tracker: " + e.getMessage());
+            System.err.println("Erro ao registrar com tracker: " + e);
         }
     }
 
@@ -129,7 +129,7 @@ class Peer {
             Message response = (Message) in.readObject();
 
         } catch (Exception e) {
-            System.err.println("Erro no announce: " + e.getMessage());
+            System.err.println("Erro no announce: " + e);
         }
     }
 
@@ -218,7 +218,7 @@ class Peer {
             }
 
         } catch (Exception e) {
-            System.err.println("Erro ao buscar peers para " + fileName + ": " + e.getMessage());
+            System.err.println("Erro ao buscar peers para " + fileName + ": " + e);
         }
     }
 
@@ -245,7 +245,7 @@ class Peer {
             }
 
         } catch (Exception e) {
-            System.err.println("Erro ao solicitar arquivo de peer: " + e.getMessage());
+            System.err.println("Erro ao solicitar arquivo de peer: " + e);
         }
     }
 
@@ -257,7 +257,7 @@ class Peer {
                     handlePeerConnection(clientSocket);
                 } catch (IOException e) {
                     if (running.get()) {
-                        System.err.println("Erro ao aceitar conexão: " + e.getMessage());
+                        System.err.println("Erro ao aceitar conexão: " + e);
                     }
                 }
             }
@@ -277,12 +277,12 @@ class Peer {
                 }
 
             } catch (Exception e) {
-                System.err.println("Erro ao processar conexão de peer: " + e.getMessage());
+                System.err.println("Erro ao processar conexão de peer: " + e);
             } finally {
                 try {
                     clientSocket.close();
                 } catch (IOException e) {
-                    System.err.println("Erro ao fechar socket: " + e.getMessage());
+                    System.err.println("Erro ao fechar socket: " + e);
                 }
             }
         });
@@ -342,7 +342,7 @@ class Peer {
             try {
                 serverSocket.close();
             } catch (IOException e) {
-                System.err.println("Erro ao fechar servidor: " + e.getMessage());
+                System.err.println("Erro ao fechar servidor: " + e);
             }
         }
         scheduler.shutdown();

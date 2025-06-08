@@ -32,7 +32,7 @@ class PeerConnection {
             out.writeObject(message);
             out.flush();
         } catch (IOException e) {
-            System.err.println("Erro ao enviar mensagem para " + remotePeerId + ": " + e.getMessage());
+            System.err.println("Erro ao enviar mensagem para " + remotePeerId + ": " + e);
             disconnect();
         }
     }
@@ -52,7 +52,7 @@ class PeerConnection {
 
             socket.close();
         } catch (IOException e) {
-            System.err.println("Erro ao fechar conexão: " + e.getMessage());
+            System.err.println("Erro ao fechar conexão: " + e);
         }
     }
 
