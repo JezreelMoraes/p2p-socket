@@ -138,36 +138,31 @@ class Peer extends Loggable {
                  ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
                  ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
 
-                logInfo("Tentando registrar no tracker");
-
                 InetAddress localAddress = socket.getLocalAddress();
                 String ip = localAddress.getHostAddress();
 
                 Message message = new Message(Message.Type.REGISTER, id);
-                message.addData("ip", ip);
-                message.addData("port", port);
+                message.addData(Message.DataType.IP, ip);
+                message.addData(Message.DataType.PORT, port);
 
                 out.writeObject(message);
                 Message response = (Message) in.readObject();
 
-                if ("success".equals(response.getData("status"))) {
-                    logInfo("Peer " + id + " registrado com sucesso no tracker");
-                    return;
-                }
+                Boolean success = response.getData(Message.DataType.SUCCESS);
+                if (!success) throw new RuntimeException("Sem retorno de sucesso");
 
+                logInfo("Peer " + id + " registrado com sucesso no tracker");
             } catch (Exception e) {
                 logError("Erro ao registrar com tracker: " + e);
                 try { Thread.sleep(1000); } catch (InterruptedException ignored) {}
             }
         }
-
     }
 
     private void startPeriodicTasks() {
         scheduler.scheduleAtFixedRate(this::announceToTracker, 5, 3, TimeUnit.SECONDS);
         scheduler.scheduleAtFixedRate(this::runTitForTat, 5, 10, TimeUnit.SECONDS);
         scheduler.scheduleAtFixedRate(this::optimisticUnchoke, 30, 30, TimeUnit.SECONDS);
-        scheduler.scheduleAtFixedRate(this::searchForMissingFiles, 5, 20, TimeUnit.SECONDS);
     }
 
     private void announceToTracker() {
@@ -176,7 +171,7 @@ class Peer extends Loggable {
              ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
 
             Message message = new Message(Message.Type.ANNOUNCE, id);
-            message.addData("files", listOwnedFiles());
+            message.addData(Message.DataType.FILES, listOwnedFiles());
 
             out.writeObject(message);
             in.readObject();
@@ -233,53 +228,13 @@ class Peer extends Loggable {
         }
     }
 
-    private void searchForMissingFiles() {
-        Set<String> allFiles = Set.of(
-            "1.txt", "2.txt", "3.txt", "4.txt", "5.txt",
-            "6.txt", "7.txt", "8.txt", "9.txt", "10.txt"
-        );
-
-        Set<String> missingFiles = new HashSet<>(allFiles);
-        listOwnedFiles().forEach(missingFiles::remove);
-
-        if (!missingFiles.isEmpty()) {
-            String targetFile = missingFiles.iterator().next();
-            requestFileFromTracker(targetFile);
-        }
-    }
-
-    private void requestFileFromTracker(String fileName) {
-        try (Socket socket = new Socket(trackerIp, trackerPort);
-             ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
-             ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
-
-            Message message = new Message(Message.Type.REQUEST_PEERS, id);
-            message.addData("fileName", fileName);
-
-            out.writeObject(message);
-            Message response = (Message) in.readObject();
-
-            List<PeerInfo> peersWithFile = response.getData("peers");
-
-            if (!peersWithFile.isEmpty()) {
-                PeerInfo targetPeer = peersWithFile.get(0);
-                if (!targetPeer.getPeerId().equals(id)) {
-                    requestFileFromPeer(targetPeer, fileName);
-                }
-            }
-
-        } catch (Exception e) {
-            logError("Erro ao buscar peers para " + fileName + ": " + e);
-        }
-    }
-
     private void requestFileFromPeer(PeerInfo targetPeer, String fileName) {
         try (Socket socket = new Socket(targetPeer.getIp(), targetPeer.getPort());
              ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
              ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
 
             Message request = new Message(Message.Type.FILE_REQUEST, id);
-            request.addData("fileName", fileName);
+            request.addData(Message.DataType.FILE_NAME, fileName);
 
             out.writeObject(request);
             Message response = (Message) in.readObject();
@@ -289,17 +244,17 @@ class Peer extends Loggable {
                 return;
             }
 
-            Boolean success = response.getData("success");
-            if (Boolean.TRUE.equals(success)) {
-                FileUtils.createFileFromBytes(buildFilepath(fileName), response.getData("fileData"));
+            Boolean success = response.getData(Message.DataType.SUCCESS);
+            if (!success) return;
 
-                downloadCounts.put(
-                    targetPeer.getPeerId(),
-                    downloadCounts.getOrDefault(targetPeer.getPeerId(), 0) + 1
-                );
+            FileUtils.createFileFromBytes(buildFilepath(fileName), response.getData(Message.DataType.FILE_DATA));
 
-                logInfo("Peer " + id + " obteve arquivo " + fileName + " de " + targetPeer.getPeerId());
-            }
+            downloadCounts.put(
+                targetPeer.getPeerId(),
+                downloadCounts.getOrDefault(targetPeer.getPeerId(), 0) + 1
+            );
+
+            logInfo("Peer " + id + " obteve arquivo " + fileName + " de " + targetPeer.getPeerId());
         } catch (Exception e) {
             logError("Erro ao solicitar arquivo de peer " + targetPeer.getIp() + ":" + targetPeer.getPort() + " - " + e);
         }
@@ -370,7 +325,7 @@ class Peer extends Loggable {
     }
 
     private Message handleFileRequest(Message message) {
-        String fileName = message.getData("fileName");
+        String fileName = message.getData(Message.DataType.FILE_NAME);
         String requesterId = message.getSenderId();
 
         if (!listOwnedFiles().contains(fileName)) {
@@ -385,9 +340,9 @@ class Peer extends Loggable {
             byte[] fileData = FileUtils.readFileAsBytes(buildFilepath(fileName));
 
             Message response = new Message(Message.Type.FILE_RESPONSE, this.id);
-            response.addData("success", true);
-            response.addData("fileName", fileName);
-            response.addData("fileData", fileData);
+            response.addData(Message.DataType.SUCCESS, true);
+            response.addData(Message.DataType.FILE_NAME, fileName);
+            response.addData(Message.DataType.FILE_DATA, fileData);
 
             logInfo("Peer " + id + " enviou arquivo " + fileName + " para " + requesterId);
             uploadCounts.put(requesterId, uploadCounts.getOrDefault(requesterId, 0) + 1);
@@ -401,8 +356,8 @@ class Peer extends Loggable {
 
     private Message buildErrorFileResponse(String fileName) {
         Message response = new Message(Message.Type.FILE_RESPONSE, this.id);
-        response.addData("success", false);
-        response.addData("reason", listOwnedFiles().contains(fileName) ? "choked" : "file not found");
+        response.addData(Message.DataType.SUCCESS, false);
+        response.addData(Message.DataType.REASON, listOwnedFiles().contains(fileName) ? "choked" : "file not found");
 
         return response;
     }

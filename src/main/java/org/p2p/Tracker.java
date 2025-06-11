@@ -16,6 +16,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public class Tracker extends Loggable {
 
+    private static final String TRACKER_ID = "tracker";
+
     private final int port;
     private final Map<String, PeerInfo> peers;
     private final Map<String, FileInfo> files;
@@ -102,9 +104,6 @@ public class Tracker extends Loggable {
             case ANNOUNCE -> {
                 return handleAnnounce(message);
             }
-            case REQUEST_PEERS -> {
-                return handleRequestPeers(message);
-            }
             default -> {
                 logInfo("Tipo de mensagem não suportado: " + message.getType());
                 return null;
@@ -114,8 +113,8 @@ public class Tracker extends Loggable {
 
     private Message handleRegister(Message message) {
         String peerId = message.getSenderId();
-        String ip = message.getData("ip");
-        Integer port = message.getData("port");
+        String ip = message.getData(Message.DataType.IP);
+        Integer port = message.getData(Message.DataType.PORT);
 
         PeerInfo peer = new PeerInfo(peerId, ip, port);
         peers.put(peerId, peer);
@@ -123,14 +122,14 @@ public class Tracker extends Loggable {
         logInfo("Peer registrado: " + peer);
 
         Message response = new Message(Message.Type.REGISTER, "tracker");
-        response.addData("status", "success");
-        response.addData("availableFiles", new ArrayList<>(files.keySet()));
+        response.addData(Message.DataType.SUCCESS, true);
+        response.addData(Message.DataType.FILES_PER_PEAR, new ArrayList<>(files.keySet()));
         return response;
     }
 
     private Message handleAnnounce(Message message) {
         String peerId = message.getSenderId();
-        List<String> availableFiles = message.getData("files");
+        List<String> availableFiles = message.getData(Message.DataType.FILES);
 
         PeerInfo peer = peers.get(peerId);
         if (peer != null) {
@@ -148,26 +147,8 @@ public class Tracker extends Loggable {
             logInfo("Announce recebido de " + peerId + ": " + availableFiles);
         }
 
-        Message response = new Message(Message.Type.ANNOUNCE, "tracker");
-        response.addData("status", "success");
-        return response;
-    }
-
-    private Message handleRequestPeers(Message message) {
-        String fileName = message.getData("fileName");
-        List<PeerInfo> peersWithFile = new ArrayList<>();
-
-        for (PeerInfo peer : peers.values()) {
-            if (peer.getAvailableFiles().contains(fileName)) {
-                peersWithFile.add(peer);
-            }
-        }
-
-        Message response = new Message(Message.Type.PEER_LIST, "tracker");
-        response.addData("fileName", fileName);
-        response.addData("peers", peersWithFile);
-
-        logInfo("Lista de peers para " + fileName + ": " + peersWithFile.size() + " peers");
+        Message response = new Message(Message.Type.ANNOUNCE, TRACKER_ID);
+        response.addData(Message.DataType.SUCCESS, true);
 
         return response;
     }
@@ -178,7 +159,7 @@ public class Tracker extends Loggable {
             List<String> inactivePeers = new ArrayList<>();
 
             for (Map.Entry<String, PeerInfo> entry : peers.entrySet()) {
-                if (currentTime - entry.getValue().getLastSeen() > 60000) { // 1 minuto
+                if (currentTime - entry.getValue().getLastSeen() > 60000) {
                     inactivePeers.add(entry.getKey());
                 }
             }
