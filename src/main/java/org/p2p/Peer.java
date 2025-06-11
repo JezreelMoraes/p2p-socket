@@ -39,12 +39,10 @@ class Peer extends Loggable {
 
     private final Map<String, Integer> uploadCounts;
     private final Map<String, Integer> downloadCounts;
+
     private final Set<String> chokedPeers;
     private String optimisticUnchokePeer;
-
-    public static void main(String[] args) {
-        new Peer("PAIR_1", "localhost", 4444).start();
-    }
+    private Map<String, PeerInfo> peerList;
 
     public Peer(String id, String trackerIp, int trackerPort) {
         this.id = id;
@@ -146,6 +144,8 @@ class Peer extends Loggable {
                 Boolean success = response.getData(Message.DataType.SUCCESS);
                 if (!success) throw new RuntimeException("Sem retorno de sucesso");
 
+                this.peerList = response.getData(Message.DataType.FILES_PER_PEER);
+
                 logInfo("Peer " + id + " registrado com sucesso no tracker");
                 return;
             } catch (Exception e) {
@@ -159,6 +159,7 @@ class Peer extends Loggable {
         scheduler.scheduleAtFixedRate(this::announceToTracker, 5, 3, TimeUnit.SECONDS);
         scheduler.scheduleAtFixedRate(this::runTitForTat, 5, 10, TimeUnit.SECONDS);
         scheduler.scheduleAtFixedRate(this::optimisticUnchoke, 30, 30, TimeUnit.SECONDS);
+        scheduler.scheduleAtFixedRate(this::requestRarestFile, 10, 10, TimeUnit.SECONDS);
     }
 
     private void announceToTracker() {
@@ -170,7 +171,12 @@ class Peer extends Loggable {
             message.addData(Message.DataType.FILES, listOwnedFiles());
 
             out.writeObject(message);
-            in.readObject();
+            Message response = (Message) in.readObject();
+
+            Boolean success = response.getData(Message.DataType.SUCCESS);
+            if (!success) throw new RuntimeException("Sem retorno de sucesso");
+
+            this.peerList = response.getData(Message.DataType.FILES_PER_PEER);
         } catch (Exception e) {
             logError("Erro no announce: " + e);
         }
@@ -199,6 +205,16 @@ class Peer extends Loggable {
     }
 
     private void optimisticUnchoke() {
+        List<String> chokedList = new ArrayList<>(chokedPeers);
+        if (!chokedList.isEmpty()) {
+            Random random = new Random();
+            optimisticUnchokePeer = chokedList.get(random.nextInt(chokedList.size()));
+            unchokePeer(optimisticUnchokePeer);
+            logInfo("Peer " + id + " - Optimistic unchoke: " + optimisticUnchokePeer);
+        }
+    }
+
+    private void requestRarestFile() {
         List<String> chokedList = new ArrayList<>(chokedPeers);
         if (!chokedList.isEmpty()) {
             Random random = new Random();

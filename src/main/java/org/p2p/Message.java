@@ -15,7 +15,7 @@ public class Message implements Serializable {
     }
 
     public enum DataType {
-        IP, PORT, SUCCESS, REASON, FILES, FILE_NAME, FILE_DATA, FILES_PER_PEAR,
+        IP, PORT, SUCCESS, REASON, FILES, FILE_NAME, FILE_DATA, FILES_PER_PEER,
     }
 
     private final Type type;

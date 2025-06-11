@@ -5,14 +5,12 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 public class Tracker extends Loggable {
 
@@ -20,51 +18,28 @@ public class Tracker extends Loggable {
 
     private final int port;
     private final Map<String, PeerInfo> peers;
-    private final Map<String, FileInfo> files;
     private final ScheduledExecutorService scheduler;
-    private final AtomicBoolean running;
     private ServerSocket serverSocket;
-
-    public static void main(String[] args) {
-        new Tracker(4444).start();
-    }
 
     public Tracker(int port) {
         this.port = port;
         this.peers = new ConcurrentHashMap<>();
-        this.files = new ConcurrentHashMap<>();
         this.scheduler = Executors.newScheduledThreadPool(2);
-        this.running = new AtomicBoolean(false);
-
-        initializeFiles();
-    }
-
-    private void initializeFiles() {
-        for (int i = 1; i <= 10; i++) {
-            String fileName = i + ".txt";
-            files.put(fileName, new FileInfo(fileName, 1024 * i, "checksum" + i));
-        }
     }
 
     public void start() {
-        if (running.get()) return;
-
         try {
             serverSocket = new ServerSocket(port);
-            running.set(true);
 
             String ip = serverSocket.getInetAddress().getHostAddress();
             logInfo("Tracker iniciado: " + ip + ":" + port);
-            startPeerCleanup();
 
-            while (running.get()) {
+            while (!serverSocket.isClosed()) {
                 try {
                     Socket clientSocket = serverSocket.accept();
                     handleClient(clientSocket);
                 } catch (IOException e) {
-                    if (running.get()) {
-                        logError("Erro ao aceitar conexão: " + e);
-                    }
+                    logError("Erro ao aceitar conexão: " + e);
                 }
             }
         } catch (IOException e) {
@@ -83,7 +58,6 @@ public class Tracker extends Loggable {
                 if (response != null) {
                     out.writeObject(response);
                 }
-
             } catch (Exception e) {
                 logError("Erro ao processar cliente: " + e);
             } finally {
@@ -121,9 +95,10 @@ public class Tracker extends Loggable {
 
         logInfo("Peer registrado: " + peer);
 
-        Message response = new Message(Message.Type.REGISTER, "tracker");
+        Message response = new Message(Message.Type.REGISTER, TRACKER_ID);
         response.addData(Message.DataType.SUCCESS, true);
-        response.addData(Message.DataType.FILES_PER_PEAR, new ArrayList<>(files.keySet()));
+        response.addData(Message.DataType.FILES_PER_PEER, listPeers(peerId));
+
         return response;
     }
 
@@ -137,42 +112,24 @@ public class Tracker extends Loggable {
             peer.getAvailableFiles().clear();
             peer.getAvailableFiles().addAll(availableFiles);
 
-            for (String fileName : availableFiles) {
-                FileInfo fileInfo = files.get(fileName);
-                if (fileInfo != null) {
-                    fileInfo.addSeeder(peerId);
-                }
-            }
-
             logInfo("Announce recebido de " + peerId + ": " + availableFiles);
         }
 
         Message response = new Message(Message.Type.ANNOUNCE, TRACKER_ID);
         response.addData(Message.DataType.SUCCESS, true);
+        response.addData(Message.DataType.FILES_PER_PEER, listPeers(peerId));
 
         return response;
     }
 
-    private void startPeerCleanup() {
-        scheduler.scheduleAtFixedRate(() -> {
-            long currentTime = System.currentTimeMillis();
-            List<String> inactivePeers = new ArrayList<>();
-
-            for (Map.Entry<String, PeerInfo> entry : peers.entrySet()) {
-                if (currentTime - entry.getValue().getLastSeen() > 60000) {
-                    inactivePeers.add(entry.getKey());
-                }
-            }
-
-            for (String peerId : inactivePeers) {
-                peers.remove(peerId);
-                for (FileInfo fileInfo : files.values()) {
-                    fileInfo.removeSeeder(peerId);
-                }
-
-                logInfo("Peer inativo removido: " + peerId);
-            }
-        }, 30, 30, TimeUnit.SECONDS);
+    private Map<String, PeerInfo> listPeers(String peerId) {
+        return peers.entrySet()
+            .stream()
+            .filter(entry -> entry.getValue().getPeerId().equals(peerId))
+            .collect(Collectors.toMap(
+                Map.Entry::getKey,
+                Map.Entry::getValue
+            ));
     }
 
     @Override
@@ -183,8 +140,6 @@ public class Tracker extends Loggable {
     }
 
     public void stop() {
-        running.set(false);
-
         if (serverSocket != null && !serverSocket.isClosed()) {
             try {
                 serverSocket.close();
@@ -202,11 +157,6 @@ public class Tracker extends Loggable {
 
         for (PeerInfo peer : peers.values()) {
             logInfo("  " + peer);
-        }
-
-        logInfo("Arquivos disponíveis: " + files.size());
-        for (FileInfo file : files.values()) {
-            logInfo("  " + file.getFileName() + " - Seeders: " + file.getSeeders().size());
         }
 
         logInfo("========================\n");
