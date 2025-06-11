@@ -114,7 +114,7 @@ class Peer extends Loggable {
         logInfo("===============================\n");
     }
 
-    private List<String> listOwnedFiles() {
+    public List<String> listOwnedFiles() {
         try {
             return FileUtils.listFilesInDirectory(buildFilepath(""));
         } catch (IOException e) {

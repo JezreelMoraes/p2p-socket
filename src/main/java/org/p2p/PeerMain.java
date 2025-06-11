@@ -52,7 +52,7 @@ public class PeerMain {
         System.out.println("- Arquivos iniciais: " + (initialFiles.isEmpty() ? "nenhum" : initialFiles));
         
         try {
-            peer = new Peer(peerId, trackerHost, trackerPort, initialFiles);
+            peer = new Peer(peerId, trackerHost, trackerPort);
             Thread peerThread = new Thread(peer::start);
             peerThread.setDaemon(true);
             peerThread.start();
@@ -79,7 +79,7 @@ public class PeerMain {
             
             switch (command) {
                 case "1" -> peer.printStatus();
-                case "2" -> System.out.println("Arquivos do peer: " + peer.getOwnedFiles());
+                case "2" -> System.out.println("Arquivos do peer: " + peer.listOwnedFiles());
                 case "0" -> {
                     System.out.println("Encerrando Peer...");
                     shutdown();
