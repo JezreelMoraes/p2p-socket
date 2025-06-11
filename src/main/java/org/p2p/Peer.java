@@ -28,6 +28,8 @@ class Peer extends Loggable {
     private final String id;
     private final String trackerIp;
     private final int trackerPort;
+
+    @Getter
     private final Set<String> ownedFiles;
     private final Map<String, PeerConnection> connections;
     private final ScheduledExecutorService scheduler;

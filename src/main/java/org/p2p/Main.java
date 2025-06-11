@@ -11,6 +11,9 @@ import lombok.Getter;
 @Getter
 class Main {
 
+    private static final String TRACKER_HOST = "localhost";
+    private static final int TRACKER_PORT = 4444;
+
     private static Tracker tracker;
     private static List<Peer> peers;
     private static final Scanner scanner = new Scanner(System.in);
@@ -18,7 +21,7 @@ class Main {
     public static void main(String[] args) {
         System.out.println("=== SISTEMA BITTORRENT ===\n");
 
-        tracker = new Tracker(4444);
+        tracker = new Tracker(TRACKER_PORT);
         Thread trackerThread = new Thread(tracker::start);
         trackerThread.setDaemon(true);
         trackerThread.start();
@@ -26,11 +29,11 @@ class Main {
         try {
             Thread.sleep(100);
             peers = new ArrayList<>();
-            peers.add(new Peer("PAIR_1","localhost", 4444, new HashSet<>(Set.of("1.txt"))));
+            peers.add(new Peer("PAIR_1", TRACKER_HOST, TRACKER_PORT, new HashSet<>(Set.of("1.txt"))));
             Thread.sleep(100);
-            peers.add(new Peer("PAIR_2","localhost", 4444, new HashSet<>(Set.of())));
+            peers.add(new Peer("PAIR_2", TRACKER_HOST, TRACKER_PORT, new HashSet<>(Set.of())));
             Thread.sleep(100);
-            peers.add(new Peer("PAIR_3","localhost", 4444, new HashSet<>(Set.of("2.txt", "3.txt", "4.txt", "5.txt", "6.txt", "7.txt", "8.txt", "9.txt", "10.txt"))));
+            peers.add(new Peer("PAIR_3", TRACKER_HOST, TRACKER_PORT, new HashSet<>(Set.of("2.txt", "3.txt", "4.txt", "5.txt", "6.txt", "7.txt", "8.txt", "9.txt", "10.txt"))));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
