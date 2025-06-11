@@ -1,6 +1,5 @@
 package org.p2p;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -9,7 +8,6 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -42,7 +40,6 @@ class Peer extends Loggable {
     private final Map<String, Integer> uploadCounts;
     private final Map<String, Integer> downloadCounts;
     private final Set<String> chokedPeers;
-    private final Set<String> interestedPeers;
     private String optimisticUnchokePeer;
 
     public static void main(String[] args) {
@@ -59,7 +56,6 @@ class Peer extends Loggable {
         this.uploadCounts = new ConcurrentHashMap<>();
         this.downloadCounts = new ConcurrentHashMap<>();
         this.chokedPeers = ConcurrentHashMap.newKeySet();
-        this.interestedPeers = ConcurrentHashMap.newKeySet();
         this.optimisticUnchokePeer = null;
     }
 
@@ -107,7 +103,6 @@ class Peer extends Loggable {
         logInfo("Arquivos possuídos: " + listOwnedFiles());
         logInfo("Conexões ativas: " + connections.size());
         logInfo("Peers choked: " + chokedPeers);
-        logInfo("Peers interessados: " + interestedPeers);
         logInfo("Optimistic unchoke: " + optimisticUnchokePeer);
         logInfo("Upload counts: " + uploadCounts);
         logInfo("Download counts: " + downloadCounts);
@@ -152,6 +147,7 @@ class Peer extends Loggable {
                 if (!success) throw new RuntimeException("Sem retorno de sucesso");
 
                 logInfo("Peer " + id + " registrado com sucesso no tracker");
+                return;
             } catch (Exception e) {
                 logError("Erro ao registrar com tracker: " + e);
                 try { Thread.sleep(1000); } catch (InterruptedException ignored) {}
@@ -308,14 +304,6 @@ class Peer extends Loggable {
             }
             case UNCHOKE -> {
                 logInfo("Peer " + id + " foi unchoked por " + message.getSenderId());
-                return null;
-            }
-            case INTERESTED -> {
-                interestedPeers.add(message.getSenderId());
-                return null;
-            }
-            case NOT_INTERESTED -> {
-                interestedPeers.remove(message.getSenderId());
                 return null;
             }
             default -> {
