@@ -41,6 +41,7 @@ class Peer extends Loggable {
     private final Map<String, Integer> downloadCounts;
 
     private final Set<String> chokedPeers;
+    private final Set<String> unchokedPeers;
     private String optimisticUnchokePeer;
     private Map<String, PeerInfo> peerList;
 
@@ -54,6 +55,7 @@ class Peer extends Loggable {
         this.uploadCounts = new ConcurrentHashMap<>();
         this.downloadCounts = new ConcurrentHashMap<>();
         this.chokedPeers = ConcurrentHashMap.newKeySet();
+        this.unchokedPeers = ConcurrentHashMap.newKeySet();
         this.optimisticUnchokePeer = null;
     }
 
@@ -215,12 +217,9 @@ class Peer extends Loggable {
     }
 
     private void requestRarestFile() {
-        List<String> chokedList = new ArrayList<>(chokedPeers);
-        if (!chokedList.isEmpty()) {
-            Random random = new Random();
-            optimisticUnchokePeer = chokedList.get(random.nextInt(chokedList.size()));
-            unchokePeer(optimisticUnchokePeer);
-            logInfo("Peer " + id + " - Optimistic unchoke: " + optimisticUnchokePeer);
+        List<String> unchokedList = new ArrayList<>(unchokedPeers);
+        if (unchokedList.isEmpty()) {
+            return;
         }
     }
 
@@ -316,10 +315,12 @@ class Peer extends Loggable {
             }
             case CHOKE -> {
                 logInfo("Peer " + id + " foi choked por " + message.getSenderId());
+                unchokedPeers.remove(message.getSenderId());
                 return null;
             }
             case UNCHOKE -> {
                 logInfo("Peer " + id + " foi unchoked por " + message.getSenderId());
+                unchokedPeers.add(message.getSenderId());
                 return null;
             }
             default -> {
