@@ -10,13 +10,17 @@ import lombok.Getter;
 public class Message implements Serializable {
 
     public enum Type {
-        REGISTER, ANNOUNCE, REQUEST_PEERS, PEER_LIST, FILE_REQUEST,
+        REGISTER, ANNOUNCE, PEER_LIST, FILE_REQUEST,
         FILE_RESPONSE, CHOKE, UNCHOKE, INTERESTED, NOT_INTERESTED,
+    }
+
+    public enum DataType {
+        IP, PORT, SUCCESS, REASON, FILES, FILE_NAME, FILE_DATA, FILES_PER_PEAR,
     }
 
     private final Type type;
     private final String senderId;
-    private final Map<String, Object> data;
+    private final Map<DataType, Object> data;
 
     public Message(Type type, String senderId) {
         this.type = type;
@@ -24,12 +28,12 @@ public class Message implements Serializable {
         this.data = new HashMap<>();
     }
 
-    public void addData(String key, Object value) {
-        data.put(key, value);
+    public void addData(DataType dataType, Object value) {
+        data.put(dataType, value);
     }
 
     @SuppressWarnings("unchecked")
-    public <T> T getData(String key) {
-        return (T) data.get(key);
+    public <T> T getData(DataType dataType) {
+        return (T) data.get(dataType);
     }
 }
