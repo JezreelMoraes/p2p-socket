@@ -1,11 +1,13 @@
 package org.p2p;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -23,6 +25,7 @@ class Peer extends Loggable {
 
     private static final int MIN_PORT_NUMBER = 5000;
     private static final int MAX_PORT_NUMBER = 6000;
+    private static final String FILES_PATH = "./peerFiles/";
 
     @Getter
     private final String id;
@@ -30,7 +33,6 @@ class Peer extends Loggable {
     private final int trackerPort;
 
     @Getter
-    private final Set<String> ownedFiles;
     private final Map<String, PeerConnection> connections;
     private final ScheduledExecutorService scheduler;
 
@@ -48,10 +50,6 @@ class Peer extends Loggable {
     }
 
     public Peer(String id, String trackerIp, int trackerPort) {
-        this(id, trackerIp, trackerPort, new HashSet<>());
-    }
-
-    public Peer(String id, String trackerIp, int trackerPort, Set<String> files) {
         this.id = id;
         this.trackerIp = trackerIp;
         this.trackerPort = trackerPort;
@@ -63,21 +61,6 @@ class Peer extends Loggable {
         this.chokedPeers = ConcurrentHashMap.newKeySet();
         this.interestedPeers = ConcurrentHashMap.newKeySet();
         this.optimisticUnchokePeer = null;
-
-        this.ownedFiles = files;
-//        initializeRandomFiles();
-    }
-
-    private void initializeRandomFiles() {
-        Random random = new Random();
-        int numFiles = random.nextInt(5) + 2;
-
-        for (int i = 0; i < numFiles; i++) {
-            int fileNum = random.nextInt(10) + 1;
-            ownedFiles.add(fileNum + ".txt");
-        }
-
-        logInfo("Peer " + id + " inicializado com arquivos: " + ownedFiles);
     }
 
     public void start() {
@@ -96,6 +79,47 @@ class Peer extends Loggable {
             acceptConnections();
         } catch (Exception e) {
             logError("Erro ao iniciar Peer " + id + ": " + e);
+        }
+    }
+
+    @Override
+    protected String buildInfo() {
+        return String.format("Peer[%s:%d] ",
+            this.id,
+            this.port
+        );
+    }
+
+    public void stop() {
+        if (serverSocket != null && !serverSocket.isClosed()) {
+            try {
+                serverSocket.close();
+            } catch (IOException e) {
+                logError("Erro ao fechar servidor: " + e);
+            }
+        }
+
+        scheduler.shutdown();
+    }
+
+    public void printStatus() {
+        logInfo("\n=== STATUS DO PEER " + id + " ===");
+        logInfo("Arquivos possuídos: " + listOwnedFiles());
+        logInfo("Conexões ativas: " + connections.size());
+        logInfo("Peers choked: " + chokedPeers);
+        logInfo("Peers interessados: " + interestedPeers);
+        logInfo("Optimistic unchoke: " + optimisticUnchokePeer);
+        logInfo("Upload counts: " + uploadCounts);
+        logInfo("Download counts: " + downloadCounts);
+        logInfo("===============================\n");
+    }
+
+    private List<String> listOwnedFiles() {
+        try {
+            return FileUtils.listFilesInDirectory(buildFilepath(""));
+        } catch (IOException e) {
+            logError("Erro ao listar arquivos");
+            return new ArrayList<>();
         }
     }
 
@@ -140,9 +164,9 @@ class Peer extends Loggable {
     }
 
     private void startPeriodicTasks() {
-        scheduler.scheduleAtFixedRate(this::announceToTracker, 10, 30, TimeUnit.SECONDS);
-        scheduler.scheduleAtFixedRate(this::runTitForTat, 10, 10, TimeUnit.SECONDS);
-        scheduler.scheduleAtFixedRate(this::optimisticUnchoke, 15, 30, TimeUnit.SECONDS);
+        scheduler.scheduleAtFixedRate(this::announceToTracker, 5, 3, TimeUnit.SECONDS);
+        scheduler.scheduleAtFixedRate(this::runTitForTat, 5, 10, TimeUnit.SECONDS);
+        scheduler.scheduleAtFixedRate(this::optimisticUnchoke, 30, 30, TimeUnit.SECONDS);
         scheduler.scheduleAtFixedRate(this::searchForMissingFiles, 5, 20, TimeUnit.SECONDS);
     }
 
@@ -152,7 +176,7 @@ class Peer extends Loggable {
              ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
 
             Message message = new Message(Message.Type.ANNOUNCE, id);
-            message.addData("files", new ArrayList<>(ownedFiles));
+            message.addData("files", listOwnedFiles());
 
             out.writeObject(message);
             in.readObject();
@@ -164,7 +188,7 @@ class Peer extends Loggable {
     private void runTitForTat() {
         List<String> topUploaders = uploadCounts.entrySet().stream()
             .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
-            .limit(3) // Unchoke top 3 uploaders
+            .limit(3)
             .map(Map.Entry::getKey)
             .toList();
 
@@ -216,7 +240,7 @@ class Peer extends Loggable {
         );
 
         Set<String> missingFiles = new HashSet<>(allFiles);
-        missingFiles.removeAll(ownedFiles);
+        listOwnedFiles().forEach(missingFiles::remove);
 
         if (!missingFiles.isEmpty()) {
             String targetFile = missingFiles.iterator().next();
@@ -260,17 +284,22 @@ class Peer extends Loggable {
             out.writeObject(request);
             Message response = (Message) in.readObject();
 
-            if (response.getType() == Message.Type.FILE_RESPONSE) {
-                Boolean success = response.getData("success");
-                if (Boolean.TRUE.equals(success)) {
-                    ownedFiles.add(fileName);
-                    downloadCounts.put(targetPeer.getPeerId(),
-                        downloadCounts.getOrDefault(targetPeer.getPeerId(), 0) + 1);
-                    logInfo("Peer " + id + " obteve arquivo " + fileName +
-                        " de " + targetPeer.getPeerId());
-                }
+            if (response.getType() != Message.Type.FILE_RESPONSE) {
+                logInfo("Peer " + targetPeer.getPeerId() + " falhou em enviar arquivo " + fileName);
+                return;
             }
 
+            Boolean success = response.getData("success");
+            if (Boolean.TRUE.equals(success)) {
+                FileUtils.createFileFromBytes(buildFilepath(fileName), response.getData("fileData"));
+
+                downloadCounts.put(
+                    targetPeer.getPeerId(),
+                    downloadCounts.getOrDefault(targetPeer.getPeerId(), 0) + 1
+                );
+
+                logInfo("Peer " + id + " obteve arquivo " + fileName + " de " + targetPeer.getPeerId());
+            }
         } catch (Exception e) {
             logError("Erro ao solicitar arquivo de peer " + targetPeer.getIp() + ":" + targetPeer.getPort() + " - " + e);
         }
@@ -344,53 +373,42 @@ class Peer extends Loggable {
         String fileName = message.getData("fileName");
         String requesterId = message.getSenderId();
 
-        Message response = new Message(Message.Type.FILE_RESPONSE, id);
+        if (!listOwnedFiles().contains(fileName)) {
+            return buildErrorFileResponse(fileName);
+        }
 
-        if (ownedFiles.contains(fileName) && !chokedPeers.contains(requesterId)) {
-            uploadCounts.put(requesterId, uploadCounts.getOrDefault(requesterId, 0) + 1);
+        if (chokedPeers.contains(requesterId)) {
+            return buildErrorFileResponse(fileName);
+        }
+
+        try {
+            byte[] fileData = FileUtils.readFileAsBytes(buildFilepath(fileName));
+
+            Message response = new Message(Message.Type.FILE_RESPONSE, this.id);
             response.addData("success", true);
             response.addData("fileName", fileName);
+            response.addData("fileData", fileData);
 
-            logInfo("Peer " + id + " enviou arquivo " + fileName +
-                " para " + requesterId);
-        } else {
-            response.addData("success", false);
-            response.addData("reason", ownedFiles.contains(fileName) ? "choked" : "file not found");
+            logInfo("Peer " + id + " enviou arquivo " + fileName + " para " + requesterId);
+            uploadCounts.put(requesterId, uploadCounts.getOrDefault(requesterId, 0) + 1);
+
+            return response;
+        } catch (IOException e) {
+            logError("Erro ao enviar arquivo " + fileName + " para " + requesterId);
+            return buildErrorFileResponse(fileName);
         }
+    }
+
+    private Message buildErrorFileResponse(String fileName) {
+        Message response = new Message(Message.Type.FILE_RESPONSE, this.id);
+        response.addData("success", false);
+        response.addData("reason", listOwnedFiles().contains(fileName) ? "choked" : "file not found");
 
         return response;
     }
 
-    @Override
-    protected String buildInfo() {
-        return String.format("Peer[%s:%d] ",
-            this.id,
-            this.port
-        );
-    }
-
-    public void stop() {
-        if (serverSocket != null && !serverSocket.isClosed()) {
-            try {
-                serverSocket.close();
-            } catch (IOException e) {
-                logError("Erro ao fechar servidor: " + e);
-            }
-        }
-
-        scheduler.shutdown();
-    }
-
-    public void printStatus() {
-        logInfo("\n=== STATUS DO PEER " + id + " ===");
-        logInfo("Arquivos possuídos: " + ownedFiles);
-        logInfo("Conexões ativas: " + connections.size());
-        logInfo("Peers choked: " + chokedPeers);
-        logInfo("Peers interessados: " + interestedPeers);
-        logInfo("Optimistic unchoke: " + optimisticUnchokePeer);
-        logInfo("Upload counts: " + uploadCounts);
-        logInfo("Download counts: " + downloadCounts);
-        logInfo("===============================\n");
+    private String buildFilepath(String filename) {
+        return Paths.get(FILES_PATH, "/" + this.id, filename).toString();
     }
 
 }

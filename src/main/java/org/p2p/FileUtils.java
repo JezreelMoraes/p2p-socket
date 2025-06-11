@@ -48,6 +48,17 @@ public class FileUtils {
         return Files.readAllBytes(path);
     }
 
+    public static void createFileFromBytes(String filePath, byte[] data) throws IOException {
+        Path path = Paths.get(filePath);
+        Path parentDir = path.getParent();
+
+        if (parentDir != null && !Files.exists(parentDir)) {
+            Files.createDirectories(parentDir);
+        }
+
+        Files.write(path, data, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+    }
+
     public static boolean fileExists(String filePath) {
         return Files.exists(Paths.get(filePath));
     }

@@ -1,10 +1,8 @@
 package org.p2p;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Scanner;
-import java.util.Set;
 
 import lombok.Getter;
 
@@ -29,11 +27,11 @@ class Main {
         try {
             Thread.sleep(100);
             peers = new ArrayList<>();
-            peers.add(new Peer("PAIR_1", TRACKER_HOST, TRACKER_PORT, new HashSet<>(Set.of("1.txt"))));
+            peers.add(new Peer("PAIR_1", TRACKER_HOST, TRACKER_PORT));
             Thread.sleep(100);
-            peers.add(new Peer("PAIR_2", TRACKER_HOST, TRACKER_PORT, new HashSet<>(Set.of())));
+            peers.add(new Peer("PAIR_2", TRACKER_HOST, TRACKER_PORT));
             Thread.sleep(100);
-            peers.add(new Peer("PAIR_3", TRACKER_HOST, TRACKER_PORT, new HashSet<>(Set.of("2.txt", "3.txt", "4.txt", "5.txt", "6.txt", "7.txt", "8.txt", "9.txt", "10.txt"))));
+            peers.add(new Peer("PAIR_3", TRACKER_HOST, TRACKER_PORT));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
