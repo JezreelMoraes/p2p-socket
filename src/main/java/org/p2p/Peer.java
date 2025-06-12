@@ -8,6 +8,8 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -220,13 +222,66 @@ class Peer extends Loggable {
 
     private void requestRarestFile() {
         List<String> unchokedList = new ArrayList<>(unchokedPeers);
-        if (unchokedList.isEmpty()) {
-            return;
+        if (unchokedList.isEmpty()) return;
+
+        Map<String, Set<PeerInfo>> filePeersMap = new HashMap<>();
+        Map<String, Set<String>> peerFilesMap = new HashMap<>();
+        Map<String, Integer> fileCounts = new HashMap<>();
+
+        for (String peerId : unchokedList) {
+            PeerInfo peerInfo = peerList.get(peerId);
+            if (peerInfo == null) continue;
+
+            Set<String> files = peerInfo.getAvailableFiles();
+            peerFilesMap.putIfAbsent(peerId, new HashSet<>());
+
+            for (String file : files) {
+                filePeersMap.computeIfAbsent(file, k -> new HashSet<>()).add(peerInfo);
+                peerFilesMap.get(peerId).add(file);
+                fileCounts.put(file, fileCounts.getOrDefault(file, 0) + 1);
+            }
+        }
+
+        List<String> rarestFilesSort = fileCounts.entrySet().stream()
+                .sorted(Map.Entry.comparingByValue()) // arquivos mais raros primeiro
+                .map(Map.Entry::getKey)
+                .toList();
+
+        Set<String> currentFiles = new HashSet<>(listOwnedFiles());
+        Set<String> peerAlreadyRequested = new HashSet<>();
+        Set<String> filesAlreadyRequested = new HashSet<>();
+
+        for (String file : rarestFilesSort) {
+            if (currentFiles.contains(file) || filesAlreadyRequested.contains(file)) continue;
+
+            Set<PeerInfo> peers = filePeersMap.get(file);
+            if (peers == null || peers.isEmpty()) continue;
+
+            PeerInfo bestPeer = null;
+            int minRemainingFiles = Integer.MAX_VALUE;
+
+            for (PeerInfo peer : peers) {
+                String peerId = peer.getPeerId();
+                if (peerAlreadyRequested.contains(peerId)) continue;
+
+                int remaining = peerFilesMap.get(peerId).size();
+                if (remaining < minRemainingFiles) {
+                    minRemainingFiles = remaining;
+                    bestPeer = peer;
+                }
+            }
+
+            if (bestPeer != null) {
+                requestFileFromPeer(bestPeer, file);
+                peerAlreadyRequested.add(bestPeer.getPeerId());
+                filesAlreadyRequested.add(file);
+            }
         }
     }
 
     private void chokePeer(String targetPeerId) {
         chokedPeers.add(targetPeerId);
+        unchokedPeers.remove(targetPeerId);
         PeerConnection connection = connections.get(targetPeerId);
         if (connection != null) {
             connection.sendMessage(new Message(Message.Type.CHOKE, id));
@@ -235,6 +290,7 @@ class Peer extends Loggable {
 
     private void unchokePeer(String targetPeerId) {
         chokedPeers.remove(targetPeerId);
+        unchokedPeers.add(targetPeerId);
         PeerConnection connection = connections.get(targetPeerId);
         if (connection != null) {
             connection.sendMessage(new Message(Message.Type.UNCHOKE, id));
