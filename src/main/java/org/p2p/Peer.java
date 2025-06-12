@@ -41,8 +41,8 @@ class Peer extends Loggable {
     private String ip;
     private int port;
 
-    private final Map<String, Integer> uploadCounts;
-    private final Map<String, Integer> downloadCounts;
+    private final Map<String, Integer> uploadFileToPeerCounts;
+    private final Map<String, Integer> downloadFileFromPeerCounts;
 
     public Peer(String id, String trackerIp, int trackerPort) {
         this.id = id;
@@ -50,8 +50,8 @@ class Peer extends Loggable {
         this.trackerPort = trackerPort;
         this.scheduler = Executors.newScheduledThreadPool(4);
 
-        this.uploadCounts = new ConcurrentHashMap<>();
-        this.downloadCounts = new ConcurrentHashMap<>();
+        this.uploadFileToPeerCounts = new ConcurrentHashMap<>();
+        this.downloadFileFromPeerCounts = new ConcurrentHashMap<>();
         this.chokedPeers = ConcurrentHashMap.newKeySet();
         this.unchokedPeers = ConcurrentHashMap.newKeySet();
         this.optimisticUnchokePeer = null;
@@ -103,8 +103,8 @@ class Peer extends Loggable {
         logInfo("Conexões ativas: " + unchokedPeers.size());
         logInfo("Peers choked: " + chokedPeers);
         logInfo("Optimistic unchoke: " + optimisticUnchokePeer);
-        logInfo("Upload counts: " + uploadCounts);
-        logInfo("Download counts: " + downloadCounts);
+        logInfo("Upload counts: " + uploadFileToPeerCounts);
+        logInfo("Download counts: " + downloadFileFromPeerCounts);
         logInfo("===============================\n");
     }
 
@@ -189,13 +189,19 @@ class Peer extends Loggable {
     }
 
     private void runTitForTat() {
-        List<String> topUploaders = uploadCounts.entrySet().stream()
+        for (String peerId : unchokedPeers) {
+            downloadFileFromPeerCounts.putIfAbsent(peerId, 0);
+        }
+
+        downloadFileFromPeerCounts.remove(optimisticUnchokePeer);
+
+        List<String> topUploaders = downloadFileFromPeerCounts.entrySet().stream()
             .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
             .limit(3)
             .map(Map.Entry::getKey)
             .toList();
 
-        for (String peerId : peers.keySet()) {
+        for (String peerId : unchokedPeers) {
             if (!topUploaders.contains(peerId) && !peerId.equals(optimisticUnchokePeer)) {
                 chokePeer(peerId);
             }
@@ -203,10 +209,6 @@ class Peer extends Loggable {
 
         for (String peerId : topUploaders) {
             unchokePeer(peerId);
-        }
-
-        if (optimisticUnchokePeer != null) {
-            unchokePeer(optimisticUnchokePeer);
         }
     }
 
@@ -324,9 +326,9 @@ class Peer extends Loggable {
 
             FileUtils.createFileFromBytes(buildFilepath(fileName), response.getData(Message.DataType.FILE_DATA));
 
-            downloadCounts.put(
+            downloadFileFromPeerCounts.put(
                 targetPeer.getPeerId(),
-                downloadCounts.getOrDefault(targetPeer.getPeerId(), 0) + 1
+                downloadFileFromPeerCounts.getOrDefault(targetPeer.getPeerId(), 0) + 1
             );
 
             logInfo("Peer " + id + " obteve arquivo " + fileName + " de " + targetPeer.getPeerId());
@@ -395,13 +397,13 @@ class Peer extends Loggable {
 
     private Message handleFileRequest(Message message) {
         String fileName = message.getData(Message.DataType.FILE_NAME);
-        String requesterId = message.getSenderId();
+        String requesterPeerId = message.getSenderId();
 
         if (!listOwnedFiles().contains(fileName)) {
             return buildErrorFileResponse(fileName);
         }
 
-        if (chokedPeers.contains(requesterId)) {
+        if (chokedPeers.contains(requesterPeerId)) {
             return buildErrorFileResponse(fileName);
         }
 
@@ -413,12 +415,12 @@ class Peer extends Loggable {
             response.addData(Message.DataType.FILE_NAME, fileName);
             response.addData(Message.DataType.FILE_DATA, fileData);
 
-            logInfo("Peer " + id + " enviou arquivo " + fileName + " para " + requesterId);
-            uploadCounts.put(requesterId, uploadCounts.getOrDefault(requesterId, 0) + 1);
+            logInfo("Peer " + id + " enviou arquivo " + fileName + " para " + requesterPeerId);
+            uploadFileToPeerCounts.put(requesterPeerId, uploadFileToPeerCounts.getOrDefault(requesterPeerId, 0) + 1);
 
             return response;
         } catch (IOException e) {
-            logError("Erro ao enviar arquivo " + fileName + " para " + requesterId);
+            logError("Erro ao enviar arquivo " + fileName + " para " + requesterPeerId);
             return buildErrorFileResponse(fileName);
         }
     }
