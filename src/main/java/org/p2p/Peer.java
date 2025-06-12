@@ -224,56 +224,56 @@ class Peer extends Loggable {
         List<String> unchokedList = new ArrayList<>(unchokedPeers);
         if (unchokedList.isEmpty()) return;
 
-        Map<String, Set<PeerInfo>> filePeersMap = new HashMap<>();
-        Map<String, Set<String>> peerFilesMap = new HashMap<>();
+        Map<String, Set<PeerInfo>> fileUnchokedPeersMap = new HashMap<>();
+        Map<String, Set<String>> unchokedPeerFilesMap = new HashMap<>();
         Map<String, Integer> fileCounts = new HashMap<>();
 
         for (String peerId : unchokedList) {
-            PeerInfo peerInfo = peerList.get(peerId);
+            PeerInfo peerInfo = peers.get(peerId);
             if (peerInfo == null) continue;
 
             Set<String> files = peerInfo.getAvailableFiles();
-            peerFilesMap.putIfAbsent(peerId, new HashSet<>());
+            unchokedPeerFilesMap.putIfAbsent(peerId, files);
 
             for (String file : files) {
-                filePeersMap.computeIfAbsent(file, k -> new HashSet<>()).add(peerInfo);
-                peerFilesMap.get(peerId).add(file);
+                fileUnchokedPeersMap.computeIfAbsent(file, k -> new HashSet<>()).add(peerInfo);
                 fileCounts.put(file, fileCounts.getOrDefault(file, 0) + 1);
             }
         }
 
         List<String> rarestFilesSort = fileCounts.entrySet().stream()
-                .sorted(Map.Entry.comparingByValue()) // arquivos mais raros primeiro
-                .map(Map.Entry::getKey)
-                .toList();
+            .sorted(Map.Entry.comparingByValue()) // arquivos mais raros primeiro
+            .map(Map.Entry::getKey)
+            .toList();
 
-        Set<String> currentFiles = new HashSet<>(listOwnedFiles());
+        Set<String> currentOwnedFiles = new HashSet<>(listOwnedFiles());
         Set<String> peerAlreadyRequested = new HashSet<>();
         Set<String> filesAlreadyRequested = new HashSet<>();
 
         for (String file : rarestFilesSort) {
-            if (currentFiles.contains(file) || filesAlreadyRequested.contains(file)) continue;
+            if (currentOwnedFiles.contains(file)) continue;
+            if (filesAlreadyRequested.contains(file)) continue;
 
-            Set<PeerInfo> peers = filePeersMap.get(file);
+            Set<PeerInfo> peers = fileUnchokedPeersMap.get(file);
             if (peers == null || peers.isEmpty()) continue;
 
-            PeerInfo bestPeer = null;
-            int minRemainingFiles = Integer.MAX_VALUE;
+            PeerInfo bestChoicePeer = null;
+            int minRemainingFilesCount = Integer.MAX_VALUE;
 
             for (PeerInfo peer : peers) {
                 String peerId = peer.getPeerId();
                 if (peerAlreadyRequested.contains(peerId)) continue;
 
-                int remaining = peerFilesMap.get(peerId).size();
-                if (remaining < minRemainingFiles) {
-                    minRemainingFiles = remaining;
-                    bestPeer = peer;
+                int remainingFilesCount = unchokedPeerFilesMap.get(peerId).size();
+                if (remainingFilesCount < minRemainingFilesCount) {
+                    minRemainingFilesCount = remainingFilesCount;
+                    bestChoicePeer = peer;
                 }
             }
 
-            if (bestPeer != null) {
-                requestFileFromPeer(bestPeer, file);
-                peerAlreadyRequested.add(bestPeer.getPeerId());
+            if (bestChoicePeer != null) {
+                requestFileFromPeer(bestChoicePeer, file);
+                peerAlreadyRequested.add(bestChoicePeer.getPeerId());
                 filesAlreadyRequested.add(file);
             }
         }
