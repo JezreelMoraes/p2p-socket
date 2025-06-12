@@ -31,16 +31,16 @@ class Main {
         System.out.println("0 - Sair\n");
 
         peers = new ArrayList<>();
-        peers.add(new Peer("PAIR_1", TRACKER_HOST, TRACKER_PORT));
-        peers.add(new Peer("PAIR_2", TRACKER_HOST, TRACKER_PORT));
-        peers.add(new Peer("PAIR_3", TRACKER_HOST, TRACKER_PORT));
 
         try {
-            for (Peer peer : peers) {
-                Thread.sleep(1000);
+            for (int i = 1; i <= 10; i++) {
+                Peer peer = new Peer("PEER_" + i, TRACKER_HOST, TRACKER_PORT);
+                peers.add(peer);
                 Thread peerThread = new Thread(peer::start);
                 peerThread.setDaemon(true);
                 peerThread.start();
+
+                Thread.sleep(100);
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
