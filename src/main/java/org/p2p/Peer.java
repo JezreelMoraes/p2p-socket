@@ -159,6 +159,12 @@ class Peer extends Loggable {
         }
     }
 
+    private void setPeersAsChocked() {
+        for (String peerId : this.peers.keySet()) {
+            chokePeer(peerId);
+        }
+    }
+
     private void startPeriodicTasks() {
         scheduler.scheduleAtFixedRate(this::announceToTracker, 5, 3, TimeUnit.SECONDS);
         scheduler.scheduleAtFixedRate(this::runTitForTat, 5, 10, TimeUnit.SECONDS);
@@ -280,18 +286,24 @@ class Peer extends Loggable {
     private void chokePeer(String targetPeerId) {
         chokedPeers.add(targetPeerId);
         unchokedPeers.remove(targetPeerId);
-        PeerConnection connection = connections.get(targetPeerId);
-        if (connection != null) {
+
+        try {
+            PeerConnection connection = new PeerConnection(peers.get(targetPeerId));
             connection.sendMessage(new Message(Message.Type.CHOKE, id));
+        } catch (IOException e) {
+            logError("Erro ao enviar mensagem de choked para par " + targetPeerId + " " + e);
         }
     }
 
     private void unchokePeer(String targetPeerId) {
-        chokedPeers.remove(targetPeerId);
-        unchokedPeers.add(targetPeerId);
-        PeerConnection connection = connections.get(targetPeerId);
-        if (connection != null) {
+        try {
+            PeerConnection connection = new PeerConnection(peers.get(targetPeerId));
             connection.sendMessage(new Message(Message.Type.UNCHOKE, id));
+
+            chokedPeers.remove(targetPeerId);
+            unchokedPeers.add(targetPeerId);
+        } catch (IOException e) {
+            logError("Erro ao enviar mensagem de unchoked para par " + targetPeerId + " " + e);
         }
     }
 
@@ -331,8 +343,8 @@ class Peer extends Loggable {
         scheduler.submit(() -> {
             while (!serverSocket.isClosed()) {
                 try {
-                    Socket clientSocket = serverSocket.accept();
-                    handlePeerConnection(clientSocket);
+                    PeerConnection peerConnection = new PeerConnection(serverSocket.accept());
+                    handlePeerConnection(peerConnection);
                 } catch (IOException e) {
                     logError("Erro ao aceitar conexão: " + e);
                 }
@@ -340,25 +352,19 @@ class Peer extends Loggable {
         });
     }
 
-    private void handlePeerConnection(Socket clientSocket) {
+    private void handlePeerConnection(PeerConnection peerConnection) {
         scheduler.submit(() -> {
-            try (ObjectInputStream in = new ObjectInputStream(clientSocket.getInputStream());
-                 ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream())) {
-
-                Message message = (Message) in.readObject();
+            try {
+                Message message = peerConnection.receiveMessage();
                 Message response = processPeerMessage(message);
 
                 if (response != null) {
-                    out.writeObject(response);
+                    peerConnection.sendMessage(response);
                 }
             } catch (Exception e) {
                 logError("Erro ao processar conexão de peer: " + e);
             } finally {
-                try {
-                    clientSocket.close();
-                } catch (IOException e) {
-                    logError("Erro ao fechar socket: " + e);
-                }
+                peerConnection.disconnect();
             }
         });
     }
