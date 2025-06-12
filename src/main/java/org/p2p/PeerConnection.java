@@ -1,5 +1,6 @@
 package org.p2p;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -50,7 +51,26 @@ class PeerConnection {
 
     public Message receiveMessage() throws IOException, ClassNotFoundException {
         if (!connected.get()) return null;
-        return (Message) in.readObject();
+
+        try {
+            Object obj = in.readObject();
+
+            if (obj instanceof Message message) {
+                return message;
+            } else {
+                System.err.println("Objeto recebido não é do tipo Message: " + obj.getClass());
+                return null;
+            }
+
+        } catch (EOFException e) {
+            System.err.println("Conexão encerrada pelo peer " + remotePeerId);
+            disconnect();
+            return null;
+        } catch (IOException | ClassNotFoundException e) {
+            System.err.println("Erro ao receber mensagem de " + remotePeerId + ": " + e);
+            disconnect();
+            throw e;
+        }
     }
 
     public void disconnect() {

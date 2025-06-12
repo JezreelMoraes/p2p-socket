@@ -284,15 +284,15 @@ class Peer extends Loggable {
     }
 
     private void chokePeer(String targetPeerId) {
-        chokedPeers.add(targetPeerId);
-        unchokedPeers.remove(targetPeerId);
-
         try {
             PeerConnection connection = new PeerConnection(peers.get(targetPeerId));
             connection.sendMessage(new Message(Message.Type.CHOKE, id));
         } catch (IOException e) {
             logError("Erro ao enviar mensagem de choked para par " + targetPeerId + " " + e);
         }
+
+        chokedPeers.add(targetPeerId);
+        unchokedPeers.remove(targetPeerId);
     }
 
     private void unchokePeer(String targetPeerId) {
@@ -363,6 +363,7 @@ class Peer extends Loggable {
                 }
             } catch (Exception e) {
                 logError("Erro ao processar conexão de peer: " + e);
+                e.printStackTrace();
             } finally {
                 peerConnection.disconnect();
             }
@@ -370,6 +371,10 @@ class Peer extends Loggable {
     }
 
     private Message processPeerMessage(Message message) {
+        if (message == null) {
+            return null;
+        }
+
         switch (message.getType()) {
             case FILE_REQUEST -> {
                 return handleFileRequest(message);

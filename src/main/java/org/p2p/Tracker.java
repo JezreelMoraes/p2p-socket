@@ -125,7 +125,7 @@ public class Tracker extends Loggable {
     private Map<String, PeerInfo> listPeers(String peerId) {
         return peers.entrySet()
             .stream()
-            .filter(entry -> entry.getValue().getPeerId().equals(peerId))
+            .filter(entry -> !entry.getValue().getPeerId().equals(peerId))
             .collect(Collectors.toMap(
                 Map.Entry::getKey,
                 Map.Entry::getValue
