@@ -373,10 +373,12 @@ class Peer extends Loggable {
             case CHOKE -> {
                 logInfo("Choked por " + message.getSenderId());
                 unchokedPeers.remove(message.getSenderId());
+                chokedPeers.add(message.getSenderId());
                 return null;
             }
             case UNCHOKE -> {
                 logInfo("Unchoked por " + message.getSenderId());
+                chokedPeers.remove(message.getSenderId());
                 unchokedPeers.add(message.getSenderId());
                 return null;
             }
