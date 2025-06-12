@@ -30,8 +30,11 @@ class Peer extends Loggable {
     private final String trackerIp;
     private final int trackerPort;
 
-    @Getter
+    private Map<String, PeerInfo> peerList;
     private final Map<String, PeerConnection> connections;
+    private final Set<String> chokedPeers;
+    private final Set<String> unchokedPeers;
+    private String optimisticUnchokePeer;
     private final ScheduledExecutorService scheduler;
 
     private ServerSocket serverSocket;
@@ -40,10 +43,6 @@ class Peer extends Loggable {
     private final Map<String, Integer> uploadCounts;
     private final Map<String, Integer> downloadCounts;
 
-    private final Set<String> chokedPeers;
-    private final Set<String> unchokedPeers;
-    private String optimisticUnchokePeer;
-    private Map<String, PeerInfo> peerList;
 
     public Peer(String id, String trackerIp, int trackerPort) {
         this.id = id;
@@ -69,8 +68,10 @@ class Peer extends Loggable {
 
             logInfo("Registrando no tracker");
             registerWithTracker();
+
             logInfo("Iniciando atividades periodicas");
             startPeriodicTasks();
+
             logInfo("Aceitando comunicação de pares");
             acceptConnections();
         } catch (Exception e) {
@@ -179,6 +180,7 @@ class Peer extends Loggable {
             if (!success) throw new RuntimeException("Sem retorno de sucesso");
 
             this.peerList = response.getData(Message.DataType.FILES_PER_PEER);
+
         } catch (Exception e) {
             logError("Erro no announce: " + e);
         }
@@ -191,9 +193,9 @@ class Peer extends Loggable {
             .map(Map.Entry::getKey)
             .toList();
 
-        for (String peer : connections.keySet()) {
-            if (!topUploaders.contains(peer) && !peer.equals(optimisticUnchokePeer)) {
-                chokePeer(peer);
+        for (String peerId : connections.keySet()) {
+            if (!topUploaders.contains(peerId) && !peerId.equals(optimisticUnchokePeer)) {
+                chokePeer(peerId);
             }
         }
 
@@ -295,7 +297,6 @@ class Peer extends Loggable {
                 if (response != null) {
                     out.writeObject(response);
                 }
-
             } catch (Exception e) {
                 logError("Erro ao processar conexão de peer: " + e);
             } finally {
@@ -314,12 +315,12 @@ class Peer extends Loggable {
                 return handleFileRequest(message);
             }
             case CHOKE -> {
-                logInfo("Peer " + id + " foi choked por " + message.getSenderId());
+                logInfo("Choked por " + message.getSenderId());
                 unchokedPeers.remove(message.getSenderId());
                 return null;
             }
             case UNCHOKE -> {
-                logInfo("Peer " + id + " foi unchoked por " + message.getSenderId());
+                logInfo("Unchoked por " + message.getSenderId());
                 unchokedPeers.add(message.getSenderId());
                 return null;
             }

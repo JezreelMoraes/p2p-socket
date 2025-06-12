@@ -10,12 +10,13 @@ import lombok.Getter;
 public class Message implements Serializable {
 
     public enum Type {
-        REGISTER, ANNOUNCE, PEER_LIST, FILE_REQUEST,
-        FILE_RESPONSE, CHOKE, UNCHOKE, INTERESTED, NOT_INTERESTED,
+        REGISTER, ANNOUNCE, FILE_REQUEST,
+        FILE_RESPONSE, CHOKE, UNCHOKE, EXIT
     }
 
     public enum DataType {
-        IP, PORT, SUCCESS, REASON, FILES, FILE_NAME, FILE_DATA, FILES_PER_PEER,
+        IP, PORT, SUCCESS, REASON, FILES,
+        FILE_NAME, FILE_DATA, FILES_PER_PEER,
     }
 
     private final Type type;
