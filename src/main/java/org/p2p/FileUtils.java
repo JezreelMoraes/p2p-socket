@@ -13,6 +13,17 @@ import java.util.List;
 
 public class FileUtils {
 
+    public static void main(String[] args) {
+        try {
+            for (int i = 1; i <= 100; i ++) {
+                String text = "Arquivo " + i + " :)";
+                createFile("./peerFiles/PEER_1/file_" + i + ".txt", text);
+            }
+        } catch (Exception exception) {
+            System.out.println("Erro: " + exception);
+        }
+    }
+
     public static void createFile(String filePath, String content) throws IOException {
         Path path = Paths.get(filePath);
         Path parentDir = path.getParent();
