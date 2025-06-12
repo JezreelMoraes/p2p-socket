@@ -32,8 +32,7 @@ class Peer extends Loggable {
     private final String trackerIp;
     private final int trackerPort;
 
-    private Map<String, PeerInfo> peerList;
-    private final Map<String, PeerConnection> connections;
+    private Map<String, PeerInfo> peers;
     private final Set<String> chokedPeers;
     private final Set<String> unchokedPeers;
     private String optimisticUnchokePeer;
@@ -50,7 +49,6 @@ class Peer extends Loggable {
         this.id = id;
         this.trackerIp = trackerIp;
         this.trackerPort = trackerPort;
-        this.connections = new ConcurrentHashMap<>();
         this.scheduler = Executors.newScheduledThreadPool(4);
 
         this.uploadCounts = new ConcurrentHashMap<>();
@@ -104,7 +102,7 @@ class Peer extends Loggable {
     public void printStatus() {
         logInfo("\n=== STATUS DO PEER " + id + " ===");
         logInfo("Arquivos possuídos: " + listOwnedFiles());
-        logInfo("Conexões ativas: " + connections.size());
+        logInfo("Conexões ativas: " + unchokedPeers.size());
         logInfo("Peers choked: " + chokedPeers);
         logInfo("Optimistic unchoke: " + optimisticUnchokePeer);
         logInfo("Upload counts: " + uploadCounts);
@@ -149,7 +147,8 @@ class Peer extends Loggable {
                 Boolean success = response.getData(Message.DataType.SUCCESS);
                 if (!success) throw new RuntimeException("Sem retorno de sucesso");
 
-                this.peerList = response.getData(Message.DataType.FILES_PER_PEER);
+                this.peers = response.getData(Message.DataType.FILES_PER_PEER);
+                setPeersAsChocked();
 
                 logInfo("Peer " + id + " registrado com sucesso no tracker");
                 return;
@@ -181,8 +180,7 @@ class Peer extends Loggable {
             Boolean success = response.getData(Message.DataType.SUCCESS);
             if (!success) throw new RuntimeException("Sem retorno de sucesso");
 
-            this.peerList = response.getData(Message.DataType.FILES_PER_PEER);
-
+            this.peers = response.getData(Message.DataType.FILES_PER_PEER);
         } catch (Exception e) {
             logError("Erro no announce: " + e);
         }
@@ -195,14 +193,14 @@ class Peer extends Loggable {
             .map(Map.Entry::getKey)
             .toList();
 
-        for (String peerId : connections.keySet()) {
+        for (String peerId : peers.keySet()) {
             if (!topUploaders.contains(peerId) && !peerId.equals(optimisticUnchokePeer)) {
                 chokePeer(peerId);
             }
         }
 
-        for (String peer : topUploaders) {
-            unchokePeer(peer);
+        for (String peerId : topUploaders) {
+            unchokePeer(peerId);
         }
 
         if (optimisticUnchokePeer != null) {
