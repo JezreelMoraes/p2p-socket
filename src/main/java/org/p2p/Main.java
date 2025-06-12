@@ -24,6 +24,12 @@ class Main {
         trackerThread.setDaemon(true);
         trackerThread.start();
 
+        System.out.println("Sistema iniciado! Comandos disponíveis:");
+        System.out.println("1 - Status do Tracker");
+        System.out.println("2 - Status dos Peers");
+        System.out.println("3 - Status de um Peer específico");
+        System.out.println("0 - Sair\n");
+
         peers = new ArrayList<>();
         peers.add(new Peer("PAIR_1", TRACKER_HOST, TRACKER_PORT));
         peers.add(new Peer("PAIR_2", TRACKER_HOST, TRACKER_PORT));
@@ -40,14 +46,7 @@ class Main {
             Thread.currentThread().interrupt();
         }
 
-        System.out.println("Sistema iniciado! Comandos disponíveis:");
-        System.out.println("1 - Status do Tracker");
-        System.out.println("2 - Status dos Peers");
-        System.out.println("3 - Status de um Peer específico");
-        System.out.println("0 - Sair");
-
         while (true) {
-            System.out.print("\nComando: ");
             String command = scanner.nextLine().trim();
 
             switch (command) {
