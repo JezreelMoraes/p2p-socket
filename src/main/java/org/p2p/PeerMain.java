@@ -1,6 +1,7 @@
 package org.p2p;
 
 import java.util.HashSet;
+import java.util.Random;
 import java.util.Scanner;
 import java.util.Set;
 
@@ -10,7 +11,7 @@ public class PeerMain {
     private static final String DEFAULT_TRACKER_HOST = "localhost";
     private static final int DEFAULT_TRACKER_PORT = 4444;
 
-    private static final String DEFAULT_PEER_ID = "PEER_DEFAULT";
+    private static final String DEFAULT_PEER_ID = "PEER_DEFAULT_";
 
     private static Peer peer;
     private static final Scanner scanner = new Scanner(System.in);
@@ -20,7 +21,10 @@ public class PeerMain {
 
         String trackerHost = DEFAULT_TRACKER_HOST;
         int trackerPort = DEFAULT_TRACKER_PORT;
-        String peerId = DEFAULT_PEER_ID;
+
+        Random random = new Random();
+
+        String peerId = DEFAULT_PEER_ID + random.nextInt(100000);
         Set<String> initialFiles = new HashSet<>();
 
         if (args.length >= 1) {

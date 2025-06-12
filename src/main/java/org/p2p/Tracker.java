@@ -79,7 +79,7 @@ public class Tracker extends Loggable {
                 return handleAnnounce(message);
             }
             default -> {
-                logInfo("Tipo de mensagem não suportado: " + message.getType());
+                logError("Tipo de mensagem não suportado: " + message.getType());
                 return null;
             }
         }
@@ -111,8 +111,6 @@ public class Tracker extends Loggable {
             peer.updateLastSeen();
             peer.getAvailableFiles().clear();
             peer.getAvailableFiles().addAll(availableFiles);
-
-            logInfo("Announce recebido de " + peerId + ": " + availableFiles);
         }
 
         Message response = new Message(Message.Type.ANNOUNCE, TRACKER_ID);
@@ -152,14 +150,14 @@ public class Tracker extends Loggable {
     }
 
     public void printStatus() {
-        logInfo("\n=== STATUS DO TRACKER ===");
-        logInfo("Peers conectados: " + peers.size());
+        System.out.println("\n=== STATUS DO TRACKER ===");
+        System.out.println("Peers conectados: " + peers.size());
 
         for (PeerInfo peer : peers.values()) {
-            logInfo("  " + peer);
+            System.out.println("  " + peer);
         }
 
-        logInfo("========================\n");
+        System.out.println("========================\n");
     }
 
 }

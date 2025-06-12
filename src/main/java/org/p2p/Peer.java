@@ -62,7 +62,7 @@ class Peer extends Loggable {
             this.port = findFreePort();
             this.serverSocket = new ServerSocket(port);
             this.ip = serverSocket.getInetAddress().getHostAddress();
-            logInfo("Peer " + id + " iniciado: " + ip + ":" + port);
+            logInfo("Iniciando: " + ip + ":" + port);
 
             logInfo("Aceitando comunicação de pares");
             acceptConnections();
@@ -98,14 +98,14 @@ class Peer extends Loggable {
     }
 
     public void printStatus() {
-        logInfo("\n=== STATUS DO PEER " + id + " ===");
-        logInfo("Arquivos possuídos: " + listOwnedFiles());
-        logInfo("Conexões ativas: " + unchokedPeers.size());
-        logInfo("Peers choked: " + chokedPeers);
-        logInfo("Optimistic unchoke: " + optimisticUnchokePeer);
-        logInfo("Upload counts: " + uploadFileToPeerCounts);
-        logInfo("Download counts: " + downloadFileFromPeerCounts);
-        logInfo("===============================\n");
+        System.out.println("\n=== STATUS DO PEER " + id + " ===");
+        System.out.println("Arquivos possuídos: " + listOwnedFiles());
+        System.out.println("Conexões ativas: " + unchokedPeers.size());
+        System.out.println("Peers choked: " + chokedPeers);
+        System.out.println("Optimistic unchoke: " + optimisticUnchokePeer);
+        System.out.println("Upload counts: " + uploadFileToPeerCounts);
+        System.out.println("Download counts: " + downloadFileFromPeerCounts);
+        System.out.println("===============================\n");
     }
 
     public List<String> listOwnedFiles() {
@@ -146,7 +146,7 @@ class Peer extends Loggable {
                 this.peers = response.getData(Message.DataType.FILES_PER_PEER);
                 setPeersAsChocked();
 
-                logInfo("Peer " + id + " registrado com sucesso no tracker");
+                logInfo("Registrado com sucesso no tracker");
                 return;
             } catch (Exception e) {
                 logError("Erro ao registrar com tracker: " + e);
@@ -219,7 +219,8 @@ class Peer extends Loggable {
         Random random = new Random();
         optimisticUnchokePeer = chokedList.get(random.nextInt(chokedList.size()));
         unchokePeer(optimisticUnchokePeer);
-        logInfo("Peer " + id + " - Optimistic unchoke: " + optimisticUnchokePeer);
+
+        logInfo("Optimistic unchoked: " + optimisticUnchokePeer);
     }
 
     private void requestRarestFile() {
@@ -331,9 +332,9 @@ class Peer extends Loggable {
                 downloadFileFromPeerCounts.getOrDefault(targetPeer.getPeerId(), 0) + 1
             );
 
-            logInfo("Peer " + id + " obteve arquivo " + fileName + " de " + targetPeer.getPeerId());
+            logInfo(" < Obteve arquivo " + fileName + " de " + targetPeer.getPeerId());
         } catch (Exception e) {
-            logError("Erro ao solicitar arquivo de peer " + targetPeer.getIp() + ":" + targetPeer.getPort() + " - " + e);
+            logError("Erro ao solicitar arquivo de peer " + targetPeer.getPeerId() + " - " + e);
         }
     }
 
@@ -415,7 +416,7 @@ class Peer extends Loggable {
             response.addData(Message.DataType.FILE_NAME, fileName);
             response.addData(Message.DataType.FILE_DATA, fileData);
 
-            logInfo("Peer " + id + " enviou arquivo " + fileName + " para " + requesterPeerId);
+            logInfo(" > Enviou arquivo " + fileName + " para " + requesterPeerId);
             uploadFileToPeerCounts.put(requesterPeerId, uploadFileToPeerCounts.getOrDefault(requesterPeerId, 0) + 1);
 
             return response;
