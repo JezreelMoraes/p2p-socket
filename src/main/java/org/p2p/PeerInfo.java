@@ -27,14 +27,6 @@ public class PeerInfo implements Serializable {
         this.lastSeen = System.currentTimeMillis();
     }
 
-    public void addFile(String fileName) {
-        availableFiles.add(fileName);
-    }
-
-    public void removeFile(String fileName) {
-        availableFiles.remove(fileName);
-    }
-
     @Override
     public String toString() {
         return String.format(
