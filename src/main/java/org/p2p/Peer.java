@@ -136,6 +136,7 @@ class Peer extends Loggable {
                 Message message = new Message(Message.Type.REGISTER, id);
                 message.addData(Message.DataType.IP, ip);
                 message.addData(Message.DataType.PORT, port);
+                message.addData(Message.DataType.FILES, listOwnedFiles());
 
                 out.writeObject(message);
                 Message response = (Message) in.readObject();

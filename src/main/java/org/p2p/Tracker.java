@@ -89,8 +89,11 @@ public class Tracker extends Loggable {
         String peerId = message.getSenderId();
         String ip = message.getData(Message.DataType.IP);
         Integer port = message.getData(Message.DataType.PORT);
+        List<String> availableFiles = message.getData(Message.DataType.FILES);
 
         PeerInfo peer = new PeerInfo(peerId, ip, port);
+        peer.getAvailableFiles().addAll(availableFiles);
+
         peers.put(peerId, peer);
 
         logInfo("Peer registrado: " + peer);
