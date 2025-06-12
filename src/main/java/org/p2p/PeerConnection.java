@@ -6,20 +6,31 @@ import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import lombok.Getter;
-
 class PeerConnection {
 
-    @Getter
-    private final String remotePeerId;
+    public static final int PEER_CONNECTION_TIMEOUT_MS = 1000;
+
     private final Socket socket;
     private final ObjectOutputStream out;
     private final ObjectInputStream in;
     private final AtomicBoolean connected;
 
-    public PeerConnection(String remotePeerId, Socket socket) throws IOException {
-        this.remotePeerId = remotePeerId;
-        this.socket = socket;
+    private String remotePeerId;
+
+    public PeerConnection(PeerInfo peerInfo) throws IOException {
+        try (Socket peerSocket = new Socket(peerInfo.getIp(), peerInfo.getPort())) {
+            this.remotePeerId = peerInfo.getPeerId();
+            this.socket = peerSocket;
+            this.socket.setSoTimeout(PEER_CONNECTION_TIMEOUT_MS);
+            this.out = new ObjectOutputStream(socket.getOutputStream());
+            this.in = new ObjectInputStream(socket.getInputStream());
+            this.connected = new AtomicBoolean(true);
+        }
+    }
+
+    public PeerConnection(Socket peerSocket) throws IOException {
+        this.socket = peerSocket;
+        this.socket.setSoTimeout(PEER_CONNECTION_TIMEOUT_MS);
         this.out = new ObjectOutputStream(socket.getOutputStream());
         this.in = new ObjectInputStream(socket.getInputStream());
         this.connected = new AtomicBoolean(true);
@@ -39,7 +50,6 @@ class PeerConnection {
 
     public Message receiveMessage() throws IOException, ClassNotFoundException {
         if (!connected.get()) return null;
-
         return (Message) in.readObject();
     }
 
