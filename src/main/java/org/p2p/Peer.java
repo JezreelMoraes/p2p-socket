@@ -212,12 +212,12 @@ class Peer extends Loggable {
 
     private void optimisticUnchoke() {
         List<String> chokedList = new ArrayList<>(chokedPeers);
-        if (!chokedList.isEmpty()) {
-            Random random = new Random();
-            optimisticUnchokePeer = chokedList.get(random.nextInt(chokedList.size()));
-            unchokePeer(optimisticUnchokePeer);
-            logInfo("Peer " + id + " - Optimistic unchoke: " + optimisticUnchokePeer);
-        }
+        if (chokedList.isEmpty()) return;
+
+        Random random = new Random();
+        optimisticUnchokePeer = chokedList.get(random.nextInt(chokedList.size()));
+        unchokePeer(optimisticUnchokePeer);
+        logInfo("Peer " + id + " - Optimistic unchoke: " + optimisticUnchokePeer);
     }
 
     private void requestRarestFile() {
