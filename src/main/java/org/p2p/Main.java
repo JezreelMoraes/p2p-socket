@@ -24,22 +24,20 @@ class Main {
         trackerThread.setDaemon(true);
         trackerThread.start();
 
+        peers = new ArrayList<>();
+        peers.add(new Peer("PAIR_1", TRACKER_HOST, TRACKER_PORT));
+        peers.add(new Peer("PAIR_2", TRACKER_HOST, TRACKER_PORT));
+        peers.add(new Peer("PAIR_3", TRACKER_HOST, TRACKER_PORT));
+
         try {
-            Thread.sleep(100);
-            peers = new ArrayList<>();
-            peers.add(new Peer("PAIR_1", TRACKER_HOST, TRACKER_PORT));
-            Thread.sleep(100);
-            peers.add(new Peer("PAIR_2", TRACKER_HOST, TRACKER_PORT));
-            Thread.sleep(100);
-            peers.add(new Peer("PAIR_3", TRACKER_HOST, TRACKER_PORT));
+            for (Peer peer : peers) {
+                Thread.sleep(1000);
+                Thread peerThread = new Thread(peer::start);
+                peerThread.setDaemon(true);
+                peerThread.start();
+            }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-        }
-
-        for (Peer peer : peers) {
-            Thread peerThread = new Thread(peer::start);
-            peerThread.setDaemon(true);
-            peerThread.start();
         }
 
         System.out.println("Sistema iniciado! Comandos disponíveis:");
