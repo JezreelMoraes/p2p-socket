@@ -3,7 +3,6 @@ package org.p2p;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.file.Paths;
@@ -39,11 +38,11 @@ class Peer extends Loggable {
     private final ScheduledExecutorService scheduler;
 
     private ServerSocket serverSocket;
+    private String ip;
     private int port;
 
     private final Map<String, Integer> uploadCounts;
     private final Map<String, Integer> downloadCounts;
-
 
     public Peer(String id, String trackerIp, int trackerPort) {
         this.id = id;
@@ -60,20 +59,19 @@ class Peer extends Loggable {
 
     public void start() {
         try {
-            findFreePort();
-
-            this.serverSocket = new ServerSocket(this.port);
-            String ip = serverSocket.getInetAddress().getHostAddress();
+            this.port = findFreePort();
+            this.serverSocket = new ServerSocket(port);
+            this.ip = serverSocket.getInetAddress().getHostAddress();
             logInfo("Peer " + id + " iniciado: " + ip + ":" + port);
+
+            logInfo("Aceitando comunicação de pares");
+            acceptConnections();
 
             logInfo("Registrando no tracker");
             registerWithTracker();
 
             logInfo("Iniciando atividades periodicas");
             startPeriodicTasks();
-
-            logInfo("Aceitando comunicação de pares");
-            acceptConnections();
         } catch (Exception e) {
             logError("Erro ao iniciar Peer " + id + ": " + e);
         }
@@ -119,13 +117,14 @@ class Peer extends Loggable {
         }
     }
 
-    private void findFreePort() {
+    private int findFreePort() {
         for (int port = MIN_PORT_NUMBER; port <= MAX_PORT_NUMBER; port++) {
             try (ServerSocket ignored = new ServerSocket(port)) {
-                this.port = port;
-                break;
+                return port;
             } catch (IOException ignored) {}
         }
+
+        throw new RuntimeException("Nenhum porta disponivel encontrada");
     }
 
     private void registerWithTracker() {
@@ -133,9 +132,6 @@ class Peer extends Loggable {
             try (Socket socket = new Socket(trackerIp, trackerPort);
                  ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
                  ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
-
-                InetAddress localAddress = socket.getLocalAddress();
-                String ip = localAddress.getHostAddress();
 
                 Message message = new Message(Message.Type.REGISTER, id);
                 message.addData(Message.DataType.IP, ip);
@@ -362,7 +358,7 @@ class Peer extends Loggable {
                     peerConnection.sendMessage(response);
                 }
             } catch (Exception e) {
-                logError("Erro ao processar conexão de peer: " + e);
+                logError("Erro ao processar conexão de peer: " + peerConnection.getRemotePeerId() +  " - " + e);
                 e.printStackTrace();
             } finally {
                 peerConnection.disconnect();
