@@ -5,17 +5,18 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
-import java.util.concurrent.atomic.AtomicBoolean;
 
-class PeerConnection {
+import lombok.Getter;
 
-    public static final int PEER_CONNECTION_TIMEOUT_MS = 1000;
+class PeerConnection extends Loggable {
+
+    public static final int PEER_CONNECTION_TIMEOUT_MS = 5000;
 
     private final Socket socket;
     private final ObjectOutputStream out;
     private final ObjectInputStream in;
-    private final AtomicBoolean connected;
 
+    @Getter
     private String remotePeerId;
 
     public PeerConnection(PeerInfo peerInfo) throws IOException {
@@ -25,7 +26,6 @@ class PeerConnection {
             this.socket.setSoTimeout(PEER_CONNECTION_TIMEOUT_MS);
             this.out = new ObjectOutputStream(socket.getOutputStream());
             this.in = new ObjectInputStream(socket.getInputStream());
-            this.connected = new AtomicBoolean(true);
         }
     }
 
@@ -34,23 +34,22 @@ class PeerConnection {
         this.socket.setSoTimeout(PEER_CONNECTION_TIMEOUT_MS);
         this.out = new ObjectOutputStream(socket.getOutputStream());
         this.in = new ObjectInputStream(socket.getInputStream());
-        this.connected = new AtomicBoolean(true);
     }
 
     public void sendMessage(Message message) {
-        if (!connected.get()) return;
+        if (this.socket.isClosed()) return;
 
         try {
             out.writeObject(message);
             out.flush();
         } catch (IOException e) {
-            System.err.println("Erro ao enviar mensagem para " + remotePeerId + ": " + e);
+            logError("Erro ao enviar mensagem para " + remotePeerId + ": " + e);
             disconnect();
         }
     }
 
     public Message receiveMessage() throws IOException, ClassNotFoundException {
-        if (!connected.get()) return null;
+        if (this.socket.isClosed()) return null;
 
         try {
             Object obj = in.readObject();
@@ -63,19 +62,17 @@ class PeerConnection {
             }
 
         } catch (EOFException e) {
-            System.err.println("Conexão encerrada pelo peer " + remotePeerId);
+            logError("Conexão encerrada pelo peer " + remotePeerId);
             disconnect();
             return null;
         } catch (IOException | ClassNotFoundException e) {
-            System.err.println("Erro ao receber mensagem de " + remotePeerId + ": " + e);
+            logError("Erro ao receber mensagem de " + remotePeerId + ": " + e);
             disconnect();
             throw e;
         }
     }
 
     public void disconnect() {
-        connected.set(false);
-
         try {
             if (socket == null) return;
             if (socket.isClosed()) return;
@@ -86,8 +83,8 @@ class PeerConnection {
         }
     }
 
-    public boolean isConnected() {
-        return connected.get() && !socket.isClosed();
+    @Override
+    String buildInfo() {
+        return "[PeerConnection] ";
     }
-
 }
