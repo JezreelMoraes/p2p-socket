@@ -20,13 +20,11 @@ class PeerConnection extends Loggable {
     private String remotePeerId;
 
     public PeerConnection(PeerInfo peerInfo) throws IOException {
-        try (Socket peerSocket = new Socket(peerInfo.getIp(), peerInfo.getPort())) {
-            this.remotePeerId = peerInfo.getPeerId();
-            this.socket = peerSocket;
-            this.socket.setSoTimeout(PEER_CONNECTION_TIMEOUT_MS);
-            this.out = new ObjectOutputStream(socket.getOutputStream());
-            this.in = new ObjectInputStream(socket.getInputStream());
-        }
+        this.remotePeerId = peerInfo.getPeerId();
+        this.socket = new Socket(peerInfo.getIp(), peerInfo.getPort());
+        this.socket.setSoTimeout(PEER_CONNECTION_TIMEOUT_MS);
+        this.out = new ObjectOutputStream(socket.getOutputStream());
+        this.in = new ObjectInputStream(socket.getInputStream());
     }
 
     public PeerConnection(Socket peerSocket) throws IOException {
