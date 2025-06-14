@@ -17,8 +17,6 @@ public class PeerMain {
     private static final Scanner scanner = new Scanner(System.in);
 
     public static void main(String[] args) {
-        System.out.println("=== PEER BITTORRENT ===\n");
-
         String trackerHost = DEFAULT_TRACKER_HOST;
         int trackerPort = DEFAULT_TRACKER_PORT;
 
@@ -50,10 +48,16 @@ public class PeerMain {
             }
         }
 
+        System.out.println("=== PEER BITTORRENT ===\n");
+        System.out.println("Peer iniciado! Comandos disponíveis:");
+        System.out.println("1 - Status do Peer");
+        System.out.println("2 - Listar arquivos disponíveis");
+        System.out.println("0 - Sair\n");
+
         System.out.println("Configurações do Peer:");
         System.out.println("- ID: " + peerId);
         System.out.println("- Tracker: " + trackerHost + ":" + trackerPort);
-        System.out.println("- Arquivos iniciais: " + (initialFiles.isEmpty() ? "nenhum" : initialFiles));
+        System.out.println("- Arquivos iniciais: " + (initialFiles.isEmpty() ? "nenhum" : initialFiles) + "\n");
 
         try {
             peer = new Peer(peerId, trackerHost, trackerPort);
@@ -72,13 +76,7 @@ public class PeerMain {
             return;
         }
 
-        System.out.println("\nPeer iniciado! Comandos disponíveis:");
-        System.out.println("1 - Status do Peer");
-        System.out.println("2 - Listar arquivos disponíveis");
-        System.out.println("0 - Sair");
-
         while (true) {
-            System.out.print("\nComando: ");
             String command = scanner.nextLine().trim();
 
             switch (command) {

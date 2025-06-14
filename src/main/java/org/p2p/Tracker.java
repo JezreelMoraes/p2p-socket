@@ -16,6 +16,7 @@ public class Tracker extends Loggable {
 
     private static final String TRACKER_ID = "tracker";
 
+    private String ip;
     private final int port;
     private final Map<String, PeerInfo> peers;
     private final ScheduledExecutorService scheduler;
@@ -31,7 +32,7 @@ public class Tracker extends Loggable {
         try {
             serverSocket = new ServerSocket(port);
 
-            String ip = serverSocket.getInetAddress().getHostAddress();
+            this.ip = serverSocket.getInetAddress().getHostAddress();
             logInfo("Tracker iniciado: " + ip + ":" + port);
 
             while (!serverSocket.isClosed()) {
@@ -135,7 +136,8 @@ public class Tracker extends Loggable {
 
     @Override
     protected String buildInfo() {
-        return String.format("Tracker[%d] ",
+        return String.format("Tracker[%s:%d] ",
+            this.ip,
             this.port
         );
     }

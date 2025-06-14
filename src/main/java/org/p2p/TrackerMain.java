@@ -25,23 +25,16 @@ public class TrackerMain {
 
         System.out.println("Iniciando Tracker na porta: " + port);
 
+        System.out.println("Tracker iniciado! Comandos disponíveis:");
+        System.out.println("1 - Status do Tracker");
+        System.out.println("0 - Sair\n");
+
         tracker = new Tracker(port);
         Thread trackerThread = new Thread(tracker::start);
         trackerThread.setDaemon(true);
         trackerThread.start();
 
-        try {
-            Thread.sleep(500);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
-
-        System.out.println("Tracker iniciado! Comandos disponíveis:");
-        System.out.println("1 - Status do Tracker");
-        System.out.println("0 - Sair");
-
         while (true) {
-            System.out.print("\nComando: ");
             String command = scanner.nextLine().trim();
 
             switch (command) {

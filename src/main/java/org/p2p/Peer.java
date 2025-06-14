@@ -79,8 +79,9 @@ class Peer extends Loggable {
 
     @Override
     protected String buildInfo() {
-        return String.format("Peer[%s:%d] ",
+        return String.format("Peer[%s:%s:%d] ",
             this.id,
+            this.ip,
             this.port
         );
     }
@@ -100,8 +101,8 @@ class Peer extends Loggable {
     public void printStatus() {
         System.out.println("\n=== STATUS DO PEER " + id + " ===");
         System.out.println("Arquivos possuídos: " + listOwnedFiles());
-        System.out.println("Conexões ativas: " + unchokedPeers.size());
         System.out.println("Peers choked: " + chokedPeers);
+        System.out.println("Peers unchoked: " + unchokedPeers);
         System.out.println("Optimistic unchoke: " + optimisticUnchokePeer);
         System.out.println("Upload counts: " + uploadFileToPeerCounts);
         System.out.println("Download counts: " + downloadFileFromPeerCounts);
@@ -333,7 +334,7 @@ class Peer extends Loggable {
                 downloadFileFromPeerCounts.getOrDefault(targetPeer.getPeerId(), 0) + 1
             );
 
-            logInfo(" < Obteve arquivo " + fileName + " de " + targetPeer.getPeerId());
+            logInfo("< Obteve arquivo " + fileName + " de " + targetPeer.getPeerId());
         } catch (Exception e) {
             logError("Erro ao solicitar arquivo de peer " + targetPeer.getPeerId() + " - " + e);
         }
@@ -417,7 +418,7 @@ class Peer extends Loggable {
             response.addData(Message.DataType.FILE_NAME, fileName);
             response.addData(Message.DataType.FILE_DATA, fileData);
 
-            logInfo(" > Enviou arquivo " + fileName + " para " + requesterPeerId);
+            logInfo("> Enviou arquivo " + fileName + " para " + requesterPeerId);
             uploadFileToPeerCounts.put(requesterPeerId, uploadFileToPeerCounts.getOrDefault(requesterPeerId, 0) + 1);
 
             return response;
