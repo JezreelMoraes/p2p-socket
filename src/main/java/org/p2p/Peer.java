@@ -77,47 +77,6 @@ class Peer extends Loggable {
         }
     }
 
-    @Override
-    protected String buildInfo() {
-        return String.format("Peer[%s:%s:%d] ",
-            this.id,
-            this.ip,
-            this.port
-        );
-    }
-
-    public void stop() {
-        if (serverSocket != null && !serverSocket.isClosed()) {
-            try {
-                serverSocket.close();
-            } catch (IOException e) {
-                logError("Erro ao fechar servidor: " + e);
-            }
-        }
-
-        scheduler.shutdown();
-    }
-
-    public void printStatus() {
-        System.out.println("\n=== STATUS DO PEER " + id + " ===");
-        System.out.println("Arquivos possuídos: " + listOwnedFiles());
-        System.out.println("Peers choked: " + chokedPeers);
-        System.out.println("Peers unchoked: " + unchokedPeers);
-        System.out.println("Optimistic unchoke: " + optimisticUnchokePeer);
-        System.out.println("Upload counts: " + uploadFileToPeerCounts);
-        System.out.println("Download counts: " + downloadFileFromPeerCounts);
-        System.out.println("===============================\n");
-    }
-
-    public List<String> listOwnedFiles() {
-        try {
-            return FileUtils.listFilesInDirectory(buildFilepath(""));
-        } catch (IOException e) {
-            logError("Erro ao listar arquivos");
-            return new ArrayList<>();
-        }
-    }
-
     private int findFreePort() {
         for (int port = MIN_PORT_NUMBER; port <= MAX_PORT_NUMBER; port++) {
             try (ServerSocket ignored = new ServerSocket(port)) {
@@ -439,6 +398,49 @@ class Peer extends Loggable {
 
     private String buildFilepath(String filename) {
         return Paths.get(FILES_PATH, "/" + this.id, filename).toString();
+    }
+
+    // Métodos para melhorar logs
+
+    @Override
+    protected String buildInfo() {
+        return String.format("Peer[%s:%s:%d] ",
+            this.id,
+            this.ip,
+            this.port
+        );
+    }
+
+    public void stop() {
+        if (serverSocket != null && !serverSocket.isClosed()) {
+            try {
+                serverSocket.close();
+            } catch (IOException e) {
+                logError("Erro ao fechar servidor: " + e);
+            }
+        }
+
+        scheduler.shutdown();
+    }
+
+    public void printStatus() {
+        System.out.println("\n=== STATUS DO PEER " + id + " ===");
+        System.out.println("Arquivos possuídos: " + listOwnedFiles());
+        System.out.println("Peers choked: " + chokedPeers);
+        System.out.println("Peers unchoked: " + unchokedPeers);
+        System.out.println("Optimistic unchoke: " + optimisticUnchokePeer);
+        System.out.println("Upload counts: " + uploadFileToPeerCounts);
+        System.out.println("Download counts: " + downloadFileFromPeerCounts);
+        System.out.println("===============================\n");
+    }
+
+    public List<String> listOwnedFiles() {
+        try {
+            return FileUtils.listFilesInDirectory(buildFilepath(""));
+        } catch (IOException e) {
+            logError("Erro ao listar arquivos");
+            return new ArrayList<>();
+        }
     }
 
 }

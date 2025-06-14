@@ -134,6 +134,8 @@ public class Tracker extends Loggable {
             ));
     }
 
+    // Métodos para melhorar logs
+
     @Override
     protected String buildInfo() {
         return String.format("Tracker[%s:%d] ",
