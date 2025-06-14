@@ -191,13 +191,14 @@ class Peer extends Loggable {
     }
 
     private void runTitForTat() {
+        Map<String, Integer> uploaders = new HashMap<>();
         for (String peerId : unchokedPeers) {
-            downloadFileFromPeerCounts.putIfAbsent(peerId, 0);
+            uploaders.put(peerId, downloadFileFromPeerCounts.getOrDefault(peerId, 0));
         }
 
-        downloadFileFromPeerCounts.remove(optimisticUnchokePeer);
+        uploaders.remove(optimisticUnchokePeer);
 
-        List<String> topUploaders = downloadFileFromPeerCounts.entrySet().stream()
+        List<String> topUploaders = uploaders.entrySet().stream()
             .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
             .limit(3)
             .map(Map.Entry::getKey)
