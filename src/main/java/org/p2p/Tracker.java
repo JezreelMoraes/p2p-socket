@@ -39,7 +39,10 @@ public class Tracker extends Loggable {
 
             byte[] receiveBuffer = new byte[65535];
 
-            while (true) {
+            logInfo("Iniciando atividades periodicas");
+            startPeriodicTasks();
+
+            while (!datagramSocket.isClosed()) {
                 try {
                     DatagramPacket receivePacket = new DatagramPacket(receiveBuffer, receiveBuffer.length);
                     datagramSocket.receive(receivePacket);
@@ -56,6 +59,22 @@ public class Tracker extends Loggable {
             }
         } catch (IOException e) {
             logError("Erro ao iniciar Tracker UDP: " + e);
+        }
+    }
+
+    private void startPeriodicTasks() {
+        scheduler.scheduleAtFixedRate(this::removeIdlePeers, 10, 10, TimeUnit.SECONDS);
+    }
+
+    private void removeIdlePeers() {
+        final long twentySecondsInMillis = 20_000;
+
+        for (PeerInfo peerInfo : peers.values()) {
+            long lastSeenTimeInMillis = System.currentTimeMillis() - peerInfo.getLastSeen();
+            if (lastSeenTimeInMillis >= twentySecondsInMillis) {
+                logInfo("Removendo par inativo: " + peerInfo.getPeerId());
+                peers.remove(peerInfo.getPeerId());
+            }
         }
     }
 
