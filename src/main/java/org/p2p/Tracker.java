@@ -8,7 +8,9 @@ import java.io.ObjectOutputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.text.SimpleDateFormat;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -36,7 +38,7 @@ public class Tracker extends Loggable {
     public void start() {
         try {
             this.datagramSocket = new DatagramSocket(port);
-            logInfo("Tracker UDP iniciado na porta " + port);
+            logInfo("Tracker UDP iniciado no ip: " + InetAddress.getLocalHost().getHostAddress() + " porta: " + port);
 
             byte[] receiveBuffer = new byte[65535];
 
@@ -150,17 +152,12 @@ public class Tracker extends Loggable {
             ));
     }
 
-    // Métodos para melhorar logs
-
     @Override
     protected String buildInfo() {
-        try {
-            return String.format("Tracker[%s:%d] ", InetAddress.getLocalHost().getHostAddress(), this.port);
-        } catch (IOException e) {
-            logError("Erro ao obter endereço IP do Tracker: " + e);
-            return String.format("Tracker[%d] ", this.port);
-        }
+        String timestamp = new SimpleDateFormat("HH:mm:ss.SSS").format(new Date());
+        return String.format("Tracker [%s]: ", timestamp);
     }
+
 
     public void stop() {
         if (datagramSocket != null && !datagramSocket.isClosed()) {
