@@ -52,7 +52,7 @@ public class PeerMain {
         System.out.println("- Arquivos iniciais: " + (initialFiles.isEmpty() ? "nenhum" : initialFiles));
 
         try {
-            peer = new Peer(peerId, trackerHost, trackerPort);
+            peer = new Peer(trackerHost, trackerPort);
             Thread peerThread = new Thread(peer::start);
             peerThread.setDaemon(true);
             peerThread.start();

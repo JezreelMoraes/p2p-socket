@@ -36,7 +36,7 @@ public class TrackerMain {
             Thread.currentThread().interrupt();
         }
 
-        System.out.println("Tracker iniciado! Comandos disponíveis:");
+        System.out.println("Comandos disponíveis:");
         System.out.println("1 - Status do Tracker");
         System.out.println("0 - Sair");
 

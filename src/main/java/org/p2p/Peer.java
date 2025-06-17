@@ -1,12 +1,19 @@
 package org.p2p;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -27,7 +34,7 @@ class Peer extends Loggable {
     private static final String FILES_PATH = "./peerFiles/";
 
     @Getter
-    private final String id;
+    private String id = "PEER_";
     private final String trackerIp;
     private final int trackerPort;
 
@@ -44,8 +51,7 @@ class Peer extends Loggable {
     private final Map<String, Integer> uploadFileToPeerCounts;
     private final Map<String, Integer> downloadFileFromPeerCounts;
 
-    public Peer(String id, String trackerIp, int trackerPort) {
-        this.id = id;
+    public Peer(String trackerIp, int trackerPort) {
         this.trackerIp = trackerIp;
         this.trackerPort = trackerPort;
         this.scheduler = Executors.newScheduledThreadPool(4);
@@ -61,8 +67,9 @@ class Peer extends Loggable {
         try {
             this.port = findFreePort();
             this.serverSocket = new ServerSocket(port);
-            this.ip = serverSocket.getInetAddress().getHostAddress();
-            logInfo("Peer " + id + " iniciado: " + ip + ":" + port);
+            this.ip = InetAddress.getLocalHost().getHostAddress();
+            this.id += ip + "_" + port;
+            logInfo("Peer " + id + " iniciado");
 
             logInfo("Aceitando comunicação de pares");
             acceptConnections();
@@ -79,9 +86,9 @@ class Peer extends Loggable {
 
     @Override
     protected String buildInfo() {
-        return String.format("Peer[%s:%d] ",
+        return String.format("%s[%s] ",
             this.id,
-            this.port
+            new Date()
         );
     }
 
@@ -169,22 +176,37 @@ class Peer extends Loggable {
     }
 
     private void announceToTracker() {
-        try (Socket socket = new Socket(trackerIp, trackerPort);
-             ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
-             ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
+        try (DatagramSocket socket = new DatagramSocket()) {
+            socket.setSoTimeout(5000);
 
             Message message = new Message(Message.Type.ANNOUNCE, id);
             message.addData(Message.DataType.FILES, listOwnedFiles());
 
+            ByteArrayOutputStream byteOut = new ByteArrayOutputStream();
+            ObjectOutputStream out = new ObjectOutputStream(byteOut);
             out.writeObject(message);
+            byte[] sendData = byteOut.toByteArray();
+
+            InetAddress address = InetAddress.getByName(trackerIp);
+            DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, address, trackerPort);
+            socket.send(sendPacket);
+
+            byte[] receiveBuffer = new byte[65535];
+            DatagramPacket receivePacket = new DatagramPacket(receiveBuffer, receiveBuffer.length);
+            socket.receive(receivePacket);
+
+            ByteArrayInputStream byteIn = new ByteArrayInputStream(receivePacket.getData(), 0, receivePacket.getLength());
+            ObjectInputStream in = new ObjectInputStream(byteIn);
             Message response = (Message) in.readObject();
 
             Boolean success = response.getData(Message.DataType.SUCCESS);
             if (!success) throw new RuntimeException("Sem retorno de sucesso");
 
             this.peers = response.getData(Message.DataType.FILES_PER_PEER);
+        } catch (SocketTimeoutException e) {
+            logError("Timeout ao aguardar resposta do tracker.");
         } catch (Exception e) {
-            logError("Erro no announce: " + e);
+            logError("Erro no announce via UDP: " + e);
         }
     }
 

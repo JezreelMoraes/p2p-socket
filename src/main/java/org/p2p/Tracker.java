@@ -3,6 +3,7 @@ package org.p2p;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.List;
@@ -31,8 +32,7 @@ public class Tracker extends Loggable {
         try {
             serverSocket = new ServerSocket(port);
 
-            String ip = serverSocket.getInetAddress().getHostAddress();
-            logInfo("Tracker iniciado: " + ip + ":" + port);
+            logInfo("Tracker iniciado");
 
             while (!serverSocket.isClosed()) {
                 try {
@@ -134,9 +134,12 @@ public class Tracker extends Loggable {
 
     @Override
     protected String buildInfo() {
-        return String.format("Tracker[%d] ",
-            this.port
-        );
+        try {
+            return String.format("Tracker[%s:%d] ", InetAddress.getLocalHost().getHostAddress(), this.port);
+        } catch (IOException e) {
+            logError("Erro ao obter endereço IP do Tracker: " + e);
+            return String.format("Tracker[%d] ", this.port);
+        }
     }
 
     public void stop() {
