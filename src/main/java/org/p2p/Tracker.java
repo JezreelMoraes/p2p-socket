@@ -9,8 +9,10 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -19,6 +21,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 
 public class Tracker extends Loggable {
 
@@ -169,11 +174,20 @@ public class Tracker extends Loggable {
 
     public void printStatus() {
         System.out.println("\n=== STATUS DO TRACKER ===");
-        System.out.println("Peers conectados: " + peers.size());
 
+        List<Map> peersInfo = new ArrayList<>();
         for (PeerInfo peer : peers.values()) {
-            System.out.println("  " + peer);
+            Map<String, Object> peerData = new HashMap<>();
+            peerData.put("PEER_IP", peer.getIp());
+            peerData.put("PEER_PORT", peer.getPort());
+            peerData.put("FILES_SIZE", peer.getAvailableFiles().size());
+            peerData.put("LAST_SEEN_IN_SECONDS", (long) (System.currentTimeMillis() - peer.getLastSeen()) / 1000);
+
+            peersInfo.add(peerData);
         }
+
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        System.out.println(gson.toJson(peersInfo));
 
         System.out.println("========================\n");
     }
