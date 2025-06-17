@@ -84,46 +84,6 @@ class Peer extends Loggable {
         }
     }
 
-    @Override
-    protected String buildInfo() {
-        return String.format("%s[%s] ",
-            this.id,
-            new Date()
-        );
-    }
-
-    public void stop() {
-        if (serverSocket != null && !serverSocket.isClosed()) {
-            try {
-                serverSocket.close();
-            } catch (IOException e) {
-                logError("Erro ao fechar servidor: " + e);
-            }
-        }
-
-        scheduler.shutdown();
-    }
-
-    public void printStatus() {
-        logInfo("\n=== STATUS DO PEER " + id + " ===");
-        logInfo("Arquivos possuídos: " + listOwnedFiles());
-        logInfo("Conexões ativas: " + unchokedPeers.size());
-        logInfo("Peers choked: " + chokedPeers);
-        logInfo("Optimistic unchoke: " + optimisticUnchokePeer);
-        logInfo("Upload counts: " + uploadFileToPeerCounts);
-        logInfo("Download counts: " + downloadFileFromPeerCounts);
-        logInfo("===============================\n");
-    }
-
-    public List<String> listOwnedFiles() {
-        try {
-            return FileUtils.listFilesInDirectory(buildFilepath(""));
-        } catch (IOException e) {
-            logError("Erro ao listar arquivos");
-            return new ArrayList<>();
-        }
-    }
-
     private int findFreePort() {
         for (int port = MIN_PORT_NUMBER; port <= MAX_PORT_NUMBER; port++) {
             try (ServerSocket ignored = new ServerSocket(port)) {
@@ -143,6 +103,7 @@ class Peer extends Loggable {
                 Message message = new Message(Message.Type.REGISTER, id);
                 message.addData(Message.DataType.IP, ip);
                 message.addData(Message.DataType.PORT, port);
+                message.addData(Message.DataType.FILES, listOwnedFiles());
 
                 out.writeObject(message);
                 Message response = (Message) in.readObject();
@@ -153,7 +114,7 @@ class Peer extends Loggable {
                 this.peers = response.getData(Message.DataType.FILES_PER_PEER);
                 setPeersAsChocked();
 
-                logInfo("Peer " + id + " registrado com sucesso no tracker");
+                logInfo("Registrado com sucesso no tracker");
                 return;
             } catch (Exception e) {
                 logError("Erro ao registrar com tracker: " + e);
@@ -211,13 +172,14 @@ class Peer extends Loggable {
     }
 
     private void runTitForTat() {
+        Map<String, Integer> uploaders = new HashMap<>();
         for (String peerId : unchokedPeers) {
-            downloadFileFromPeerCounts.putIfAbsent(peerId, 0);
+            uploaders.put(peerId, downloadFileFromPeerCounts.getOrDefault(peerId, 0));
         }
 
-        downloadFileFromPeerCounts.remove(optimisticUnchokePeer);
+        uploaders.remove(optimisticUnchokePeer);
 
-        List<String> topUploaders = downloadFileFromPeerCounts.entrySet().stream()
+        List<String> topUploaders = uploaders.entrySet().stream()
             .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
             .limit(3)
             .map(Map.Entry::getKey)
@@ -241,7 +203,8 @@ class Peer extends Loggable {
         Random random = new Random();
         optimisticUnchokePeer = chokedList.get(random.nextInt(chokedList.size()));
         unchokePeer(optimisticUnchokePeer);
-        logInfo("Peer " + id + " - Optimistic unchoke: " + optimisticUnchokePeer);
+
+        logInfo("Optimistic unchoked: " + optimisticUnchokePeer);
     }
 
     private void requestRarestFile() {
@@ -353,9 +316,9 @@ class Peer extends Loggable {
                 downloadFileFromPeerCounts.getOrDefault(targetPeer.getPeerId(), 0) + 1
             );
 
-            logInfo("Peer " + id + " obteve arquivo " + fileName + " de " + targetPeer.getPeerId());
+            logInfo("< Obteve arquivo " + fileName + " de " + targetPeer.getPeerId());
         } catch (Exception e) {
-            logError("Erro ao solicitar arquivo de peer " + targetPeer.getIp() + ":" + targetPeer.getPort() + " - " + e);
+            logError("Erro ao solicitar arquivo de peer " + targetPeer.getPeerId() + " - " + e);
         }
     }
 
@@ -437,7 +400,7 @@ class Peer extends Loggable {
             response.addData(Message.DataType.FILE_NAME, fileName);
             response.addData(Message.DataType.FILE_DATA, fileData);
 
-            logInfo("Peer " + id + " enviou arquivo " + fileName + " para " + requesterPeerId);
+            logInfo("> Enviou arquivo " + fileName + " para " + requesterPeerId);
             uploadFileToPeerCounts.put(requesterPeerId, uploadFileToPeerCounts.getOrDefault(requesterPeerId, 0) + 1);
 
             return response;
@@ -457,6 +420,48 @@ class Peer extends Loggable {
 
     private String buildFilepath(String filename) {
         return Paths.get(FILES_PATH, "/" + this.id, filename).toString();
+    }
+
+    // Métodos para melhorar logs
+
+    @Override
+    protected String buildInfo() {
+        return String.format("%s[%s] ",
+                this.id,
+                new Date()
+        );
+    }
+
+    public void stop() {
+        if (serverSocket != null && !serverSocket.isClosed()) {
+            try {
+                serverSocket.close();
+            } catch (IOException e) {
+                logError("Erro ao fechar servidor: " + e);
+            }
+        }
+
+        scheduler.shutdown();
+    }
+
+    public void printStatus() {
+        System.out.println("\n=== STATUS DO PEER " + id + " ===");
+        System.out.println("Arquivos possuídos: " + listOwnedFiles());
+        System.out.println("Peers choked: " + chokedPeers);
+        System.out.println("Peers unchoked: " + unchokedPeers);
+        System.out.println("Optimistic unchoke: " + optimisticUnchokePeer);
+        System.out.println("Upload counts: " + uploadFileToPeerCounts);
+        System.out.println("Download counts: " + downloadFileFromPeerCounts);
+        System.out.println("===============================\n");
+    }
+
+    public List<String> listOwnedFiles() {
+        try {
+            return FileUtils.listFilesInDirectory(buildFilepath(""));
+        } catch (IOException e) {
+            logError("Erro ao listar arquivos");
+            return new ArrayList<>();
+        }
     }
 
 }

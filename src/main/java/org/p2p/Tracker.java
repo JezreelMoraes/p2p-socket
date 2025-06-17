@@ -17,6 +17,7 @@ public class Tracker extends Loggable {
 
     private static final String TRACKER_ID = "tracker";
 
+    private String ip;
     private final int port;
     private final Map<String, PeerInfo> peers;
     private final ScheduledExecutorService scheduler;
@@ -79,7 +80,7 @@ public class Tracker extends Loggable {
                 return handleAnnounce(message);
             }
             default -> {
-                logInfo("Tipo de mensagem não suportado: " + message.getType());
+                logError("Tipo de mensagem não suportado: " + message.getType());
                 return null;
             }
         }
@@ -89,8 +90,11 @@ public class Tracker extends Loggable {
         String peerId = message.getSenderId();
         String ip = message.getData(Message.DataType.IP);
         Integer port = message.getData(Message.DataType.PORT);
+        List<String> availableFiles = message.getData(Message.DataType.FILES);
 
         PeerInfo peer = new PeerInfo(peerId, ip, port);
+        peer.getAvailableFiles().addAll(availableFiles);
+
         peers.put(peerId, peer);
 
         logInfo("Peer registrado: " + peer);
@@ -111,8 +115,6 @@ public class Tracker extends Loggable {
             peer.updateLastSeen();
             peer.getAvailableFiles().clear();
             peer.getAvailableFiles().addAll(availableFiles);
-
-            logInfo("Announce recebido de " + peerId + ": " + availableFiles);
         }
 
         Message response = new Message(Message.Type.ANNOUNCE, TRACKER_ID);
@@ -131,6 +133,8 @@ public class Tracker extends Loggable {
                 Map.Entry::getValue
             ));
     }
+
+    // Métodos para melhorar logs
 
     @Override
     protected String buildInfo() {
@@ -155,14 +159,14 @@ public class Tracker extends Loggable {
     }
 
     public void printStatus() {
-        logInfo("\n=== STATUS DO TRACKER ===");
-        logInfo("Peers conectados: " + peers.size());
+        System.out.println("\n=== STATUS DO TRACKER ===");
+        System.out.println("Peers conectados: " + peers.size());
 
         for (PeerInfo peer : peers.values()) {
-            logInfo("  " + peer);
+            System.out.println("  " + peer);
         }
 
-        logInfo("========================\n");
+        System.out.println("========================\n");
     }
 
 }

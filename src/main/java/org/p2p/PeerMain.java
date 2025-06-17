@@ -1,6 +1,7 @@
 package org.p2p;
 
 import java.util.HashSet;
+import java.util.Random;
 import java.util.Scanner;
 import java.util.Set;
 
@@ -10,17 +11,18 @@ public class PeerMain {
     private static final String DEFAULT_TRACKER_HOST = "localhost";
     private static final int DEFAULT_TRACKER_PORT = 4444;
 
-    private static final String DEFAULT_PEER_ID = "PEER_DEFAULT";
+    private static final String DEFAULT_PEER_ID = "PEER_DEFAULT_";
 
     private static Peer peer;
     private static final Scanner scanner = new Scanner(System.in);
 
     public static void main(String[] args) {
-        System.out.println("=== PEER BITTORRENT ===\n");
-
         String trackerHost = DEFAULT_TRACKER_HOST;
         int trackerPort = DEFAULT_TRACKER_PORT;
-        String peerId = DEFAULT_PEER_ID;
+
+        Random random = new Random();
+
+        String peerId = DEFAULT_PEER_ID + random.nextInt(100000);
         Set<String> initialFiles = new HashSet<>();
 
         if (args.length >= 1) {
@@ -46,10 +48,16 @@ public class PeerMain {
             }
         }
 
+        System.out.println("=== PEER BITTORRENT ===\n");
+        System.out.println("Peer iniciado! Comandos disponíveis:");
+        System.out.println("1 - Status do Peer");
+        System.out.println("2 - Listar arquivos disponíveis");
+        System.out.println("0 - Sair\n");
+
         System.out.println("Configurações do Peer:");
         System.out.println("- ID: " + peerId);
         System.out.println("- Tracker: " + trackerHost + ":" + trackerPort);
-        System.out.println("- Arquivos iniciais: " + (initialFiles.isEmpty() ? "nenhum" : initialFiles));
+        System.out.println("- Arquivos iniciais: " + (initialFiles.isEmpty() ? "nenhum" : initialFiles) + "\n");
 
         try {
             peer = new Peer(trackerHost, trackerPort);
@@ -68,13 +76,7 @@ public class PeerMain {
             return;
         }
 
-        System.out.println("\nPeer iniciado! Comandos disponíveis:");
-        System.out.println("1 - Status do Peer");
-        System.out.println("2 - Listar arquivos disponíveis");
-        System.out.println("0 - Sair");
-
         while (true) {
-            System.out.print("\nComando: ");
             String command = scanner.nextLine().trim();
 
             switch (command) {

@@ -36,11 +36,14 @@ class Main {
         peers.add(new Peer(TRACKER_HOST, TRACKER_PORT));
 
         try {
-            for (Peer peer : peers) {
-                Thread.sleep(1000);
+            for (int i = 1; i <= 10; i++) {
+                Peer peer = new Peer(TRACKER_HOST, TRACKER_PORT);
+                peers.add(peer);
                 Thread peerThread = new Thread(peer::start);
                 peerThread.setDaemon(true);
                 peerThread.start();
+
+                Thread.sleep(100);
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
