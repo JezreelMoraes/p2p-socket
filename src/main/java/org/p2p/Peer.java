@@ -68,14 +68,12 @@ class Peer extends Loggable {
             this.port = findFreePort();
             this.serverSocket = new ServerSocket(port);
             this.ip = InetAddress.getLocalHost().getHostAddress();
+
             this.id += ip + "_" + port;
             logInfo("Peer " + id + " iniciado");
 
             logInfo("Aceitando comunicação de pares");
             acceptConnections();
-
-            logInfo("Registrando no tracker");
-            registerWithTracker();
 
             logInfo("Iniciando atividades periodicas");
             startPeriodicTasks();
@@ -94,41 +92,6 @@ class Peer extends Loggable {
         throw new RuntimeException("Nenhum porta disponivel encontrada");
     }
 
-    private void registerWithTracker() {
-        while (!this.serverSocket.isClosed()) {
-            try (Socket socket = new Socket(trackerIp, trackerPort);
-                 ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
-                 ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
-
-                Message message = new Message(Message.Type.REGISTER, id);
-                message.addData(Message.DataType.IP, ip);
-                message.addData(Message.DataType.PORT, port);
-                message.addData(Message.DataType.FILES, listOwnedFiles());
-
-                out.writeObject(message);
-                Message response = (Message) in.readObject();
-
-                Boolean success = response.getData(Message.DataType.SUCCESS);
-                if (!success) throw new RuntimeException("Sem retorno de sucesso");
-
-                this.peers = response.getData(Message.DataType.FILES_PER_PEER);
-                setPeersAsChocked();
-
-                logInfo("Registrado com sucesso no tracker");
-                return;
-            } catch (Exception e) {
-                logError("Erro ao registrar com tracker: " + e);
-                try { Thread.sleep(1000); } catch (InterruptedException ignored) {}
-            }
-        }
-    }
-
-    private void setPeersAsChocked() {
-        for (String peerId : this.peers.keySet()) {
-            chokePeer(peerId);
-        }
-    }
-
     private void startPeriodicTasks() {
         scheduler.scheduleAtFixedRate(this::announceToTracker, 5, 3, TimeUnit.SECONDS);
         scheduler.scheduleAtFixedRate(this::runTitForTat, 5, 10, TimeUnit.SECONDS);
@@ -141,6 +104,8 @@ class Peer extends Loggable {
             socket.setSoTimeout(5000);
 
             Message message = new Message(Message.Type.ANNOUNCE, id);
+            message.addData(Message.DataType.IP, ip);
+            message.addData(Message.DataType.PORT, port);
             message.addData(Message.DataType.FILES, listOwnedFiles());
 
             ByteArrayOutputStream byteOut = new ByteArrayOutputStream();
@@ -163,11 +128,20 @@ class Peer extends Loggable {
             Boolean success = response.getData(Message.DataType.SUCCESS);
             if (!success) throw new RuntimeException("Sem retorno de sucesso");
 
+            boolean isFirstAnnounce = this.peers == null;
             this.peers = response.getData(Message.DataType.FILES_PER_PEER);
+
+            if (isFirstAnnounce) setPeersAsChocked();
         } catch (SocketTimeoutException e) {
             logError("Timeout ao aguardar resposta do tracker.");
         } catch (Exception e) {
             logError("Erro no announce via UDP: " + e);
+        }
+    }
+
+    private void setPeersAsChocked() {
+        for (String peerId : this.peers.keySet()) {
+            chokePeer(peerId);
         }
     }
 

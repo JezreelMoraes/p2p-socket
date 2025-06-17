@@ -10,8 +10,8 @@ import lombok.Getter;
 public class Message implements Serializable {
 
     public enum Type {
-        REGISTER, ANNOUNCE, FILE_REQUEST,
-        FILE_RESPONSE, CHOKE, UNCHOKE, EXIT
+        ANNOUNCE, FILE_REQUEST,
+        FILE_RESPONSE, CHOKE, UNCHOKE
     }
 
     public enum DataType {

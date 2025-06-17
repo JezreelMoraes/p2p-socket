@@ -8,16 +8,17 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 public class Tracker extends Loggable {
 
     private static final String TRACKER_ID = "tracker";
 
-    private String ip;
     private final int port;
     private final Map<String, PeerInfo> peers;
     private final ScheduledExecutorService scheduler;
@@ -26,7 +27,7 @@ public class Tracker extends Loggable {
     public Tracker(int port) {
         this.port = port;
         this.peers = new ConcurrentHashMap<>();
-        this.scheduler = Executors.newScheduledThreadPool(2);
+        this.scheduler = Executors.newScheduledThreadPool(3);
     }
 
     public void start() {
@@ -72,56 +73,42 @@ public class Tracker extends Loggable {
     }
 
     private Message processMessage(Message message) {
-        switch (message.getType()) {
-            case REGISTER -> {
-                return handleRegister(message);
-            }
-            case ANNOUNCE -> {
-                return handleAnnounce(message);
-            }
-            default -> {
-                logError("Tipo de mensagem não suportado: " + message.getType());
-                return null;
-            }
+        if (Objects.requireNonNull(message.getType()) == Message.Type.ANNOUNCE) {
+            return handleAnnounce(message);
         }
-    }
 
-    private Message handleRegister(Message message) {
-        String peerId = message.getSenderId();
-        String ip = message.getData(Message.DataType.IP);
-        Integer port = message.getData(Message.DataType.PORT);
-        List<String> availableFiles = message.getData(Message.DataType.FILES);
-
-        PeerInfo peer = new PeerInfo(peerId, ip, port);
-        peer.getAvailableFiles().addAll(availableFiles);
-
-        peers.put(peerId, peer);
-
-        logInfo("Peer registrado: " + peer);
-
-        Message response = new Message(Message.Type.REGISTER, TRACKER_ID);
-        response.addData(Message.DataType.SUCCESS, true);
-        response.addData(Message.DataType.FILES_PER_PEER, listPeers(peerId));
-
-        return response;
+        logError("Tipo de mensagem não suportado: " + message.getType());
+        return null;
     }
 
     private Message handleAnnounce(Message message) {
-        String peerId = message.getSenderId();
-        List<String> availableFiles = message.getData(Message.DataType.FILES);
+        PeerInfo peerInfo = registerPeerIfNecessary(message);
 
-        PeerInfo peer = peers.get(peerId);
-        if (peer != null) {
-            peer.updateLastSeen();
-            peer.getAvailableFiles().clear();
-            peer.getAvailableFiles().addAll(availableFiles);
-        }
+        List<String> availableFiles = message.getData(Message.DataType.FILES);
+        peerInfo.getAvailableFiles().clear();
+        peerInfo.getAvailableFiles().addAll(availableFiles);
+        peerInfo.updateLastSeen();
 
         Message response = new Message(Message.Type.ANNOUNCE, TRACKER_ID);
         response.addData(Message.DataType.SUCCESS, true);
-        response.addData(Message.DataType.FILES_PER_PEER, listPeers(peerId));
+        response.addData(Message.DataType.FILES_PER_PEER, listPeers(peerInfo.getPeerId()));
 
         return response;
+    }
+
+    private PeerInfo registerPeerIfNecessary(Message message) {
+        String peerId = message.getSenderId();
+        PeerInfo peerInfo = peers.get(peerId);
+        if (peerInfo != null) return peerInfo;
+
+        String peerIp = message.getData(Message.DataType.IP);
+        Integer peerPort = message.getData(Message.DataType.PORT);
+
+        peerInfo = new PeerInfo(peerId, peerIp, peerPort);
+        peers.put(peerId, peerInfo);
+
+        logInfo("Peer registrado: " + peerInfo);
+        return peerInfo;
     }
 
     private Map<String, PeerInfo> listPeers(String peerId) {
