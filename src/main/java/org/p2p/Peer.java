@@ -12,6 +12,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.nio.file.Paths;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -400,14 +401,10 @@ class Peer extends Loggable {
         return Paths.get(FILES_PATH, "/" + this.id, filename).toString();
     }
 
-    // Métodos para melhorar logs
-
     @Override
     protected String buildInfo() {
-        return String.format("%s[%s] ",
-            this.id,
-            new Date()
-        );
+        String timestamp = new SimpleDateFormat("HH:mm:ss.SSS").format(new Date());
+        return String.format("%s [%s]: ", this.id, timestamp);
     }
 
     public void stop() {
