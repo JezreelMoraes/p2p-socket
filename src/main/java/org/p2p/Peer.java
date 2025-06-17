@@ -25,6 +25,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+
 import lombok.Getter;
 
 class Peer extends Loggable {
@@ -86,7 +89,8 @@ class Peer extends Loggable {
         for (int port = MIN_PORT_NUMBER; port <= MAX_PORT_NUMBER; port++) {
             try (ServerSocket ignored = new ServerSocket(port)) {
                 return port;
-            } catch (IOException ignored) {}
+            } catch (IOException ignored) {
+            }
         }
 
         throw new RuntimeException("Nenhum porta disponivel encontrada");
@@ -319,7 +323,7 @@ class Peer extends Loggable {
                     peerConnection.sendMessage(response);
                 }
             } catch (Exception e) {
-                logError("Erro ao processar conexão de peer: " + peerConnection.getRemotePeerId() +  " - " + e);
+                logError("Erro ao processar conexão de peer: " + peerConnection.getRemotePeerId() + " - " + e);
                 e.printStackTrace();
             } finally {
                 peerConnection.disconnect();
@@ -401,8 +405,8 @@ class Peer extends Loggable {
     @Override
     protected String buildInfo() {
         return String.format("%s[%s] ",
-                this.id,
-                new Date()
+            this.id,
+            new Date()
         );
     }
 
@@ -420,12 +424,18 @@ class Peer extends Loggable {
 
     public void printStatus() {
         System.out.println("\n=== STATUS DO PEER " + id + " ===");
-        System.out.println("Arquivos possuídos: " + listOwnedFiles());
-        System.out.println("Peers choked: " + chokedPeers);
-        System.out.println("Peers unchoked: " + unchokedPeers);
-        System.out.println("Optimistic unchoke: " + optimisticUnchokePeer);
-        System.out.println("Upload counts: " + uploadFileToPeerCounts);
-        System.out.println("Download counts: " + downloadFileFromPeerCounts);
+
+        Map<String, Object> peerData = new HashMap<>();
+        peerData.put("FILES", listOwnedFiles());
+        peerData.put("CHOKED", chokedPeers);
+        peerData.put("UNCHOKED", unchokedPeers);
+        peerData.put("OPTIMISTIC_UNCHOKE", optimisticUnchokePeer);
+        peerData.put("UPDLOADS", uploadFileToPeerCounts);
+        peerData.put("DOWNLOAD", downloadFileFromPeerCounts);
+
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+
+        System.out.println(gson.toJson(peerData));
         System.out.println("===============================\n");
     }
 
