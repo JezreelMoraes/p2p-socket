@@ -1,18 +1,20 @@
 package org.p2p;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
 import java.net.InetAddress;
-import java.net.ServerSocket;
-import java.net.Socket;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 public class Tracker extends Loggable {
@@ -22,7 +24,7 @@ public class Tracker extends Loggable {
     private final int port;
     private final Map<String, PeerInfo> peers;
     private final ScheduledExecutorService scheduler;
-    private ServerSocket serverSocket;
+    private DatagramSocket datagramSocket;
 
     public Tracker(int port) {
         this.port = port;
@@ -32,44 +34,51 @@ public class Tracker extends Loggable {
 
     public void start() {
         try {
-            serverSocket = new ServerSocket(port);
+            this.datagramSocket = new DatagramSocket(port);
+            logInfo("Tracker UDP iniciado na porta " + port);
 
-            logInfo("Tracker iniciado");
+            byte[] receiveBuffer = new byte[65535];
 
-            while (!serverSocket.isClosed()) {
+            while (true) {
                 try {
-                    Socket clientSocket = serverSocket.accept();
-                    handleClient(clientSocket);
+                    DatagramPacket receivePacket = new DatagramPacket(receiveBuffer, receiveBuffer.length);
+                    datagramSocket.receive(receivePacket);
+
+                    byte[] data = Arrays.copyOf(receivePacket.getData(), receivePacket.getLength());
+                    InetAddress clientAddress = receivePacket.getAddress();
+                    int clientPort = receivePacket.getPort();
+
+                    scheduler.submit(() -> handleClientUDP(datagramSocket, data, clientAddress, clientPort));
+
                 } catch (IOException e) {
-                    logError("Erro ao aceitar conexão: " + e);
+                    logError("Erro ao receber pacote UDP: " + e);
                 }
             }
         } catch (IOException e) {
-            logError("Erro ao iniciar Tracker: " + e);
+            logError("Erro ao iniciar Tracker UDP: " + e);
         }
     }
 
-    private void handleClient(Socket clientSocket) {
-        scheduler.submit(() -> {
-            try (ObjectInputStream in = new ObjectInputStream(clientSocket.getInputStream());
-                 ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream())) {
+    private void handleClientUDP(DatagramSocket socket, byte[] data, InetAddress address, int port) {
+        try (ByteArrayInputStream byteIn = new ByteArrayInputStream(data);
+             ObjectInputStream in = new ObjectInputStream(byteIn)) {
 
-                Message message = (Message) in.readObject();
-                Message response = processMessage(message);
+            Message message = (Message) in.readObject();
+            Message response = processMessage(message);
 
-                if (response != null) {
-                    out.writeObject(response);
-                }
-            } catch (Exception e) {
-                logError("Erro ao processar cliente: " + e);
-            } finally {
-                try {
-                    clientSocket.close();
-                } catch (IOException e) {
-                    logError("Erro ao fechar socket: " + e);
-                }
+            if (response != null) {
+                ByteArrayOutputStream byteOut = new ByteArrayOutputStream();
+                ObjectOutputStream out = new ObjectOutputStream(byteOut);
+                out.writeObject(response);
+                out.flush();
+                byte[] responseData = byteOut.toByteArray();
+
+                DatagramPacket responsePacket = new DatagramPacket(responseData, responseData.length, address, port);
+                socket.send(responsePacket);
             }
-        });
+        } catch (Exception e) {
+            logError("Erro ao processar cliente UDP: " + e);
+        }
     }
 
     private Message processMessage(Message message) {
@@ -134,12 +143,8 @@ public class Tracker extends Loggable {
     }
 
     public void stop() {
-        if (serverSocket != null && !serverSocket.isClosed()) {
-            try {
-                serverSocket.close();
-            } catch (IOException e) {
-                logError("Erro ao fechar servidor: " + e);
-            }
+        if (datagramSocket != null && !datagramSocket.isClosed()) {
+            datagramSocket.close();
         }
 
         scheduler.shutdown();
