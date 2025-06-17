@@ -8,8 +8,8 @@ import java.util.Set;
 public class PeerMain {
 
     // Constantes configuráveis
-    private static final String DEFAULT_TRACKER_HOST = "0.tcp.sa.ngrok.io";
-    private static final int DEFAULT_TRACKER_PORT = 15550;
+    private static final String DEFAULT_TRACKER_HOST = "localhost";
+    private static final int DEFAULT_TRACKER_PORT = 4444;
 
     private static final String DEFAULT_PEER_ID = "PEER_DEFAULT_";
 
