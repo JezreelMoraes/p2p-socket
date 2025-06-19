@@ -423,7 +423,7 @@ class Peer extends Loggable {
         System.out.println("\n=== STATUS DO PEER " + id + " ===");
 
         Map<String, Object> peerData = new HashMap<>();
-        peerData.put("FILES", listOwnedFiles());
+        peerData.put("FILES_COUNT", listOwnedFiles().size());
         peerData.put("CHOKED", chokedPeers);
         peerData.put("UNCHOKED", unchokedPeers);
         peerData.put("OPTIMISTIC_UNCHOKE", optimisticUnchokePeer);
