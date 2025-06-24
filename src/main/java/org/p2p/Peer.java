@@ -53,6 +53,7 @@ class Peer extends Loggable {
     private int port;
 
     private final Map<String, Integer> uploadFileToPeerCounts;
+    private final Map<String, Integer> downloadFileFromPeerCountsHistory;
     private final Map<String, Integer> downloadFileFromPeerCounts;
 
     public Peer(String trackerIp, int trackerPort) {
@@ -61,6 +62,7 @@ class Peer extends Loggable {
         this.scheduler = Executors.newScheduledThreadPool(4);
 
         this.uploadFileToPeerCounts = new ConcurrentHashMap<>();
+        this.downloadFileFromPeerCountsHistory = new ConcurrentHashMap<>();
         this.downloadFileFromPeerCounts = new ConcurrentHashMap<>();
         this.chokedPeers = ConcurrentHashMap.newKeySet();
         this.unchokedPeers = ConcurrentHashMap.newKeySet();
@@ -173,6 +175,8 @@ class Peer extends Loggable {
         for (String peerId : topUploaders) {
             unchokePeer(peerId);
         }
+
+        this.downloadFileFromPeerCounts.clear();
     }
 
     private void optimisticUnchoke() {
@@ -293,6 +297,11 @@ class Peer extends Loggable {
             downloadFileFromPeerCounts.put(
                 targetPeer.getPeerId(),
                 downloadFileFromPeerCounts.getOrDefault(targetPeer.getPeerId(), 0) + 1
+            );
+
+            downloadFileFromPeerCountsHistory.put(
+                    targetPeer.getPeerId(),
+                    downloadFileFromPeerCountsHistory.getOrDefault(targetPeer.getPeerId(), 0) + 1
             );
 
             logInfo("< Obteve arquivo " + fileName + " de " + targetPeer.getPeerId());
@@ -428,7 +437,7 @@ class Peer extends Loggable {
         peerData.put("UNCHOKED", unchokedPeers);
         peerData.put("OPTIMISTIC_UNCHOKE", optimisticUnchokePeer);
         peerData.put("UPDLOADS", uploadFileToPeerCounts);
-        peerData.put("DOWNLOAD", downloadFileFromPeerCounts);
+        peerData.put("DOWNLOAD", downloadFileFromPeerCountsHistory);
 
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
 
