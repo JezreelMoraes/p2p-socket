@@ -29,9 +29,6 @@ public class PeerInfo implements Serializable {
 
     @Override
     public String toString() {
-        return String.format(
-            "Peer[%s] - Files: %s",
-            peerId, availableFiles
-        );
+        return String.format("Peer[%s]", peerId);
     }
 }

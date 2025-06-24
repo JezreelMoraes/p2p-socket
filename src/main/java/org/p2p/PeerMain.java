@@ -81,7 +81,7 @@ public class PeerMain {
 
             switch (command) {
                 case "1" -> peer.printStatus();
-                case "2" -> System.out.println("Arquivos do peer: " + peer.listOwnedFiles());
+                case "2" -> System.out.println("\nArquivos do peer: " + peer.listOwnedFiles() + "\n\n");
                 case "0" -> {
                     System.out.println("Encerrando Peer...");
                     shutdown();

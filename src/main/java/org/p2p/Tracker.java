@@ -163,7 +163,6 @@ public class Tracker extends Loggable {
         return String.format("Tracker [%s]: ", timestamp);
     }
 
-
     public void stop() {
         if (datagramSocket != null && !datagramSocket.isClosed()) {
             datagramSocket.close();
